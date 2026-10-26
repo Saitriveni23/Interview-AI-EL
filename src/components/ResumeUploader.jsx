@@ -40,6 +40,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
   const [file, setFile] = useState(null);
   const [resumeText, setResumeText] = useState('');
   const [jobDescription, setJobDescription] = useState(SAMPLE_JOB_DESCRIPTION);
+  
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,6 +72,8 @@ export default function ResumeUploader({ onParse, isLoading }) {
       formData.append('resumeText', resumeText);
     }
     formData.append('jobDescription', jobDescription);
+
+    
 
     onParse(formData);
   };
@@ -177,6 +180,8 @@ export default function ResumeUploader({ onParse, isLoading }) {
             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-200 font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
           />
         </div>
+
+        
 
         {/* Action Button */}
         <div className="flex justify-end">

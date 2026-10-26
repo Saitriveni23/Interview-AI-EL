@@ -4,75 +4,294 @@ import { parsePdfToText } from '../services/pdfParser.js';
 import { ResumeRedactor } from '../services/redactor.js';
 import { SkillExtractor } from '../services/skillExtractor.js';
 import { LLMService } from '../services/llmService.js';
+import { generateGeminiQuestions } from '../services/geminiService.js';
+import { evaluateInterview } from '../services/interviewEvaluationService.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  }
+});
 
 const redactor = new ResumeRedactor();
 const skillExtractor = new SkillExtractor();
 const llmService = new LLMService();
 
-/**
- * POST /api/resume/parse-and-redact
- * Ingests PDF resume or raw text, redacts PII & demographic bias triggers, extracts skills & skill gap delta
- */
-router.post('/parse-and-redact', upload.single('resumeFile'), async (req, res) => {
+// ==========================================
+// 1. RESUME UPLOAD AND SKILL ANALYSIS
+// ==========================================
+
+router.post(
+  '/parse-and-redact',
+  upload.single('resumeFile'),
+  async (req, res) => {
+    try {
+      let rawText = req.body.resumeText || '';
+      const jobDescription = req.body.jobDescription || '';
+
+      if (req.file) {
+        rawText = await parsePdfToText(req.file.buffer);
+      }
+
+      if (!rawText.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please provide a valid PDF resume or resume text.'
+        });
+      }
+
+      const redactionResult = redactor.redact(rawText);
+
+      const candidateProfile = skillExtractor.extract(
+        redactionResult.redactedText
+      );
+
+      const deltaAnalysis = skillExtractor.calculateDelta(
+        candidateProfile.skills,
+        jobDescription
+      );
+
+      // Preserve the existing initial study-plan behavior.
+      const studyPlan = await llmService.generateStudyPlan(
+        candidateProfile,
+        deltaAnalysis,
+        4
+      );
+
+      return res.json({
+        success: true,
+        originalText: rawText,
+        redactedText: redactionResult.redactedText,
+        auditLog: redactionResult.auditLog,
+        stats: redactionResult.stats,
+        candidateProfile,
+        deltaAnalysis,
+        studyPlan,
+        processedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Resume processing error:', error);
+
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to process resume: ' + error.message
+      });
+    }
+  }
+);
+
+// ==========================================
+// 2. GENERATE PERSONALIZED STUDY PLAN
+// ==========================================
+
+router.post('/generate-study-plan', async (req, res) => {
   try {
-    let rawText = req.body.resumeText || '';
-    const jobDescription = req.body.jobDescription || '';
-
-    // Handle PDF upload if provided
-    if (req.file) {
-      rawText = await parsePdfToText(req.file.buffer);
-    }
-
-    if (!rawText || !rawText.trim()) {
-      return res.status(400).json({ error: 'Please provide a valid PDF resume or resume text.' });
-    }
-
-    // Step 1: Execute Layer 1 Governance (Privacy & Bias Redaction)
-    const redactionResult = redactor.redact(rawText);
-
-    // Step 2: Skill Parsing & Experience Extraction
-    const candidateProfile = skillExtractor.extract(redactionResult.redactedText);
-
-    // Step 3: Delta Analysis against Target Job Description
-    const deltaAnalysis = skillExtractor.calculateDelta(candidateProfile.skills, jobDescription);
-
-    // Step 4: Up-skilling & Study Plan Generation
-    const studyPlan = await llmService.generateStudyPlan(candidateProfile, deltaAnalysis);
-
-    res.json({
-      success: true,
-      originalText: rawText,
-      redactedText: redactionResult.redactedText,
-      auditLog: redactionResult.auditLog,
-      stats: redactionResult.stats,
+    const {
       candidateProfile,
       deltaAnalysis,
-      studyPlan,
-      processedAt: new Date().toISOString()
+      preferredStudyWeeks,
+      weeklyStudyHours
+    } = req.body;
+
+    if (
+      !candidateProfile ||
+      !deltaAnalysis ||
+      !Array.isArray(candidateProfile.skills) ||
+      !Array.isArray(deltaAnalysis.missingSkills)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Candidate profile or skill-gap analysis is missing.'
+      });
+    }
+
+    const selectedWeeks = Number(preferredStudyWeeks);
+    const hoursPerWeek = Number(weeklyStudyHours);
+
+    if (
+      !Number.isInteger(selectedWeeks) ||
+      selectedWeeks < 1 ||
+      selectedWeeks > 52
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Preparation duration must be between 1 and 52 weeks.'
+      });
+    }
+
+    if (
+      !Number.isFinite(hoursPerWeek) ||
+      hoursPerWeek < 1 ||
+      hoursPerWeek > 80
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Weekly study hours must be between 1 and 80.'
+      });
+    }
+
+    const studyPlan = await llmService.generateStudyPlan(
+      candidateProfile,
+      deltaAnalysis,
+      selectedWeeks,
+      hoursPerWeek
+    );
+
+    return res.json({
+      success: true,
+      studyPlan
     });
+
   } catch (error) {
-    console.error('Error processing resume:', error);
-    res.status(500).json({ error: 'Failed to parse and redact resume: ' + error.message });
+    console.error('Study plan generation error:', error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to generate study plan: ' + error.message
+    });
   }
 });
 
-/**
- * POST /api/resume/verify-factuality
- * Layer 2 Governance: Hallucination Checker cross-referencing candidate claims against PDF resume
- */
+// ==========================================
+// 3. LAYER 2: RESUME CLAIM VERIFICATION
+// ==========================================
+
 router.post('/verify-factuality', async (req, res) => {
   try {
     const { claim, redactedResumeText } = req.body;
-    if (!claim || !redactedResumeText) {
-      return res.status(400).json({ error: 'Missing claim or redactedResumeText parameters.' });
+
+    if (
+      typeof claim !== 'string' ||
+      !claim.trim() ||
+      typeof redactedResumeText !== 'string' ||
+      !redactedResumeText.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing claim or redactedResumeText parameters.'
+      });
     }
-    const verification = await llmService.verifyClaimAgainstResume(claim, redactedResumeText);
-    res.json({ success: true, verification });
+
+    const verification = await llmService.verifyClaimAgainstResume(
+      claim,
+      redactedResumeText
+    );
+
+    return res.json({
+      success: true,
+      verification
+    });
+
   } catch (error) {
-    res.status(500).json({ error: 'Factuality check failed: ' + error.message });
+    console.error('Factuality verification error:', error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Factuality check failed: ' + error.message
+    });
+  }
+});
+
+// ==========================================
+// 4. GEMINI INTERVIEW QUESTION GENERATION
+// ==========================================
+
+router.post('/generate-questions', async (req, res) => {
+  try {
+    const { skills } = req.body;
+
+    if (!Array.isArray(skills) || skills.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide candidate skills.'
+      });
+    }
+
+    const questions = await generateGeminiQuestions(skills);
+
+    return res.json({
+      success: true,
+      source: 'gemini',
+      questions
+    });
+
+  } catch (error) {
+    console.error('Gemini question generation error:', error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to generate interview questions.'
+    });
+  }
+});
+
+// ==========================================
+// 5. AI INTERVIEW EVALUATION
+// ==========================================
+
+router.post('/evaluate-interview', async (req, res) => {
+  try {
+    const {
+      answers,
+      redactedResumeText = ''
+    } = req.body;
+
+    if (
+      !Array.isArray(answers) ||
+      answers.length !== 7
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'Exactly 7 interview answers are required.'
+      });
+    }
+
+    const validAnswers = answers.every(
+      item =>
+        item &&
+        typeof item.question === 'string' &&
+        item.question.trim() &&
+        typeof item.answer === 'string' &&
+        item.answer.trim() &&
+        [
+  'Technical',
+  'Behavioral',
+  'Situational',
+  'Resume-Based'
+].includes(
+          item.category
+        )
+    );
+
+    if (!validAnswers) {
+      return res.status(400).json({
+        success: false,
+        error: 'Interview answers contain missing or invalid information.'
+      });
+    }
+
+    const evaluation = await evaluateInterview({
+      answers,
+      redactedResumeText,
+      llmService
+    });
+
+    return res.json({
+      success: true,
+      evaluation
+    });
+
+  } catch (error) {
+    console.error('Interview evaluation error:', error);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Unable to evaluate interview answers.'
+    });
   }
 });
 

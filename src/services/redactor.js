@@ -64,6 +64,39 @@ export class ResumeRedactor {
       return '[REDACTED_PHONE]';
     });
 
+    // Redact Date of Birth and Age
+// Preserve employment dates and years of experience.
+
+const dobPattern =
+  /\b(?:date\s+of\s+birth|d\.?\s*o\.?\s*b\.?|birth\s*date|birthdate)\s*[:=-]?\s*(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})/gi;
+
+text = text.replace(dobPattern, (match) => {
+  entityCounts.age++;
+
+  auditLog.push({
+    type: 'BIAS_DATE_OF_BIRTH',
+    value: this.mask(match),
+    category: 'Discrimination Mitigation'
+  });
+
+  return '[REDACTED_DOB]';
+});
+
+const agePattern =
+  /\b(?:age|aged)\s*[:=-]?\s*\d{1,3}\b/gi;
+
+text = text.replace(agePattern, (match) => {
+  entityCounts.age++;
+
+  auditLog.push({
+    type: 'BIAS_AGE',
+    value: this.mask(match),
+    category: 'Discrimination Mitigation'
+  });
+
+  return '[REDACTED_AGE]';
+});
+
     // 3. Redact Social Profile URLs containing candidate identity
     text = text.replace(this.patterns.urls, (match) => {
       entityCounts.url++;
@@ -118,35 +151,58 @@ export class ResumeRedactor {
    * Identifies candidate name in the top section of resume or explicit fields
    */
   redactCandidateName(text, auditLog, entityCounts) {
-    const lines = text.split('\n');
-    let redactedLines = [...lines];
+  const lines = text.split('\n');
+  const redactedLines = [...lines];
 
-    // Check top 6 lines for candidate name (usually large heading or top line)
-    for (let i = 0; i < Math.min(6, lines.length); i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
+  const excludedHeadings =
+    /\b(resume|curriculum|vitae|cv|developer|engineer|manager|student|skills|experience|education|summary|projects|certifications|profile|objective|analyst|security)\b/i;
 
-      // Match "Name: John Doe" or top single-line full name (2-3 words, no numbers, no special symbols)
-      const namePrefixMatch = line.match(/^(name|candidate name|full name):\s*([A-Za-z\s.'-]+)/i);
-      if (namePrefixMatch) {
-        const foundName = namePrefixMatch[2].trim();
-        redactedLines[i] = line.replace(foundName, '[REDACTED_CANDIDATE_NAME]');
-        entityCounts.name++;
-        auditLog.push({ type: 'PII_NAME', value: foundName, category: 'Privacy Invasion' });
-      } else if (
-        i === 0 &&
-        /^[A-Z][a-z]+(\s+[A-Z][a-z]+){1,2}$/.test(line) &&
-        !/resume|curriculum|cv|developer|engineer|manager/i.test(line)
-      ) {
-        // Likely top header name
-        entityCounts.name++;
-        auditLog.push({ type: 'PII_NAME', value: line, category: 'Privacy Invasion' });
-        redactedLines[i] = '[REDACTED_CANDIDATE_NAME]';
-      }
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    const line = lines[i].trim();
+
+    if (!line) continue;
+
+    let foundName = null;
+
+    // Case 1: Explicit name field
+    // Example: Name: Priya Reddy
+    const nameMatch = line.match(
+      /^(?:name|candidate name|full name)\s*:\s*([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,4})\s*$/i
+    );
+
+    if (nameMatch) {
+      foundName = nameMatch[1].trim();
     }
 
-    return redactedLines.join('\n');
+    // Case 2: Standalone name heading
+    // Example: AARAV SHARMA
+    else if (
+      /^[A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){1,3}$/.test(line) &&
+      !excludedHeadings.test(line)
+    ) {
+      foundName = line;
+    }
+
+    if (foundName) {
+      redactedLines[i] = lines[i].replace(
+        foundName,
+        '[REDACTED_NAME]'
+      );
+
+      entityCounts.name++;
+
+      auditLog.push({
+        type: 'PII_NAME',
+        value: this.mask(foundName),
+        category: 'Privacy Invasion'
+      });
+
+      break;
+    }
   }
+
+  return redactedLines.join('\n');
+}
 
   mask(str) {
     if (str.length <= 4) return '***';
