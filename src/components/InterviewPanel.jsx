@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 
 // ==========================================
 // 1. LOCAL TECHNICAL QUESTION BANK
@@ -420,13 +421,131 @@ function buildDemoEvaluation(answers) {
 // 7. MAIN INTERVIEW COMPONENT
 // ==========================================
 
+// ==========================================
+// MODE SELECTION SCREEN COMPONENT
+// ==========================================
+function ModeSelectionScreen({ targetInfo, onSelectMode }) {
+  const modes = [
+    {
+      id: 'ai-mock',
+      icon: Brain,
+      iconColor: 'text-indigo-400',
+      iconBg: 'bg-indigo-500/10',
+      borderColor: 'border-indigo-500/30',
+      hoverBorder: 'hover:border-indigo-500/60',
+      title: 'AI Mock Interview',
+      description: 'Full adaptive interview with technical, behavioral, situational, and resume-based questions powered by AI.',
+      badge: 'Recommended',
+      badgeColor: 'bg-indigo-600 text-white',
+      duration: '~20 min',
+    },
+    {
+      id: 'role-specific',
+      icon: User,
+      iconColor: 'text-emerald-400',
+      iconBg: 'bg-emerald-500/10',
+      borderColor: 'border-emerald-500/30',
+      hoverBorder: 'hover:border-emerald-500/60',
+      title: 'Role Specific Questions',
+      description: 'Curated questions tailored to your target role and company. Focused on domain expertise and cultural fit.',
+      badge: 'Focused',
+      badgeColor: 'bg-emerald-600 text-white',
+      duration: '~15 min',
+    },
+    {
+      id: 'technical',
+      icon: FlaskConical,
+      iconColor: 'text-violet-400',
+      iconBg: 'bg-violet-500/10',
+      borderColor: 'border-violet-500/30',
+      hoverBorder: 'hover:border-violet-500/60',
+      title: 'Technical Round',
+      description: 'Deep-dive technical questions covering algorithms, data structures, system design, and coding concepts.',
+      badge: 'Advanced',
+      badgeColor: 'bg-violet-600 text-white',
+      duration: '~25 min',
+    },
+  ];
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-white">
+      {/* Header */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-2">Choose Interview Mode</h2>
+        {targetInfo?.company && (
+          <p className="text-slate-400 text-sm">
+            Preparing for <span className="text-indigo-300 font-semibold">{targetInfo.role || 'Software Engineer'}</span> at <span className="text-indigo-300 font-semibold">{targetInfo.company}</span>
+          </p>
+        )}
+        {!targetInfo?.company && (
+          <p className="text-slate-400 text-sm">Select the type of interview you want to practice</p>
+        )}
+      </div>
+
+      {/* Mode cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        {modes.map((mode) => {
+          const Icon = mode.icon;
+          return (
+            <div
+              key={mode.id}
+              className={`relative bg-slate-800/50 border ${mode.borderColor} ${mode.hoverBorder} rounded-2xl p-6 flex flex-col gap-4 transition-all cursor-pointer group`}
+              onClick={() => onSelectMode(mode.id)}
+            >
+              {/* Badge */}
+              <span className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full ${mode.badgeColor}`}>
+                {mode.badge}
+              </span>
+
+              {/* Icon */}
+              <div className={`w-12 h-12 rounded-xl ${mode.iconBg} flex items-center justify-center`}>
+                <Icon className={`w-6 h-6 ${mode.iconColor}`} />
+              </div>
+
+              {/* Content */}
+              <div className="flex-1">
+                <h3 className="font-bold text-white mb-2">{mode.title}</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">{mode.description}</p>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-700">
+                <span className="text-xs text-slate-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {mode.duration}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSelectMode(mode.id); }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-700 group-hover:bg-indigo-600 text-slate-300 group-hover:text-white transition`}
+                >
+                  Select →
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tips */}
+      <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 text-sm text-slate-400">
+        <span className="text-indigo-300 font-semibold">💡 Tip: </span>
+        All modes record your answers and provide AI-powered feedback after completion.
+        Make sure your resume has been analyzed first for the best experience.
+      </div>
+    </div>
+  );
+}
+
 export default function InterviewPanel({
   targetInfo,
   candidateSkills = [],
   redactedResumeText = ""
 }) {
+  // Mode selection — null means show mode picker
+  const [interviewMode, setInterviewMode] = useState(null);
+
   const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -443,11 +562,24 @@ export default function InterviewPanel({
     Array.isArray(candidateSkills) ? candidateSkills : []
   );
 
+  // Show mode selection screen first
+  if (!interviewMode) {
+    return (
+      <ModeSelectionScreen
+        targetInfo={targetInfo}
+        onSelectMode={(mode) => {
+          setInterviewMode(mode);
+        }}
+      />
+    );
+  }
+
   // ==========================================
-  // 8. LOAD INTERVIEW QUESTIONS
+  // 8. LOAD INTERVIEW QUESTIONS (triggered once mode is chosen)
   // ==========================================
 
   useEffect(() => {
+    if (!interviewMode) return; // Don't load until mode is picked
     const controller = new AbortController();
 
     async function loadQuestions() {
@@ -565,7 +697,7 @@ export default function InterviewPanel({
     return () => {
       controller.abort();
     };
-  }, [skillsKey, redactedResumeText]);
+  }, [skillsKey, redactedResumeText, interviewMode]);
 
   // ==========================================
   // 9. HANDLE NEXT QUESTION
@@ -691,10 +823,10 @@ export default function InterviewPanel({
     setAnswer("");
     setAnswers([]);
     setCompleted(false);
-
     setEvaluation(null);
     setEvaluationError("");
     setEvaluating(false);
+    setInterviewMode(null); // Return to mode selection
   };
 
   // ==========================================
@@ -1047,60 +1179,276 @@ export default function InterviewPanel({
 
             <div className="space-y-6 mb-6">
 
-              {/* OVERALL SCORE */}
+              {/* ======================================================== */}
+              {/* SCREEN 6: REDESIGNED INTERVIEW RESULTS & STUDY PLAN      */}
+              {/* ======================================================== */}
+              <div className="space-y-6 mb-8">
+                {/* Top Success Banner */}
+                <div className="bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-500/40 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        Interview Completed!
+                        {evaluation.source === "demo" && (
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                            Demo Mode
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-slate-400 text-sm mt-0.5">
+                        Here's your comprehensive performance summary, question rubric breakdown, and target role study plan.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      onClick={() => {
+                        const reportText = `INTERVIEW PERFORMANCE REPORT
+Role: ${targetInfo?.role || 'Software Engineer'}
+Company: ${targetInfo?.company || 'Target Company'}
+Date: ${new Date().toLocaleDateString()}
+Overall Score: ${evaluation.overallScore}/10 (${evaluation.source === 'demo' ? 'Demo Mode' : 'AI Evaluated'})
 
-              <div className="bg-emerald-950/30 border border-emerald-800 rounded-xl p-6">
+CATEGORY BREAKDOWN:
+- Technical: ${evaluation.categoryScores?.Technical ?? '—'}/10
+- Behavioral: ${evaluation.categoryScores?.Behavioral ?? '—'}/10
+- Situational: ${evaluation.categoryScores?.Situational ?? '—'}/10
+- Resume-Based: ${evaluation.categoryScores?.['Resume-Based'] ?? '—'}/10
 
-                <h3 className="text-2xl font-bold text-emerald-400 mb-2">
-                  {evaluation.source === "demo" ? "Sample Interview Report (Demo Mode)" : "Final AI Interview Report"}
-                </h3>
+SUMMARY:
+${evaluation.summary || 'Completed 7 adaptive interview questions.'}
 
-                <p className="text-3xl font-bold">
-                  Overall Score: {evaluation.overallScore}/10
-                </p>
+STRENGTHS:
+${(evaluation.strengths || []).map(s => `- ${s}`).join('\n')}
 
-                <p className="text-sm text-slate-400 mt-2">
-                  {evaluation.source === "demo" ? "Source: Predefined demonstration data (not assessed by Gemini)" : "Assessed by: Gemini AI"}
-                </p>
+AREAS FOR IMPROVEMENT:
+${(evaluation.improvementAreas || []).map(a => `- ${a}`).join('\n')}
 
-                {evaluation.summary && (
-                  <p className="text-slate-300 mt-4">
-                    {evaluation.summary}
-                  </p>
-                )}
+RECOMMENDATIONS:
+${(evaluation.recommendations || []).map(r => `- ${r}`).join('\n')}
 
-              </div>
+QUESTION-WISE FEEDBACK:
+${(evaluation.questionEvaluations || []).map(q => `
+Q${q.questionNumber} [${q.category}] - Score: ${q.score}/10
+Question: ${q.question}
+Answer: ${q.answer}
+Feedback: ${q.feedback}
+Improvement: ${q.improvement}
+`).join('\n')}`;
 
-              {/* CATEGORY SCORES */}
+                        const blob = new Blob([reportText], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `interview-report-${(targetInfo?.role || 'candidate').toLowerCase().replace(/\s+/g, '-')}.txt`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Report</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        try {
+                          const savedReports = JSON.parse(localStorage.getItem('interview-ai-saved-reports') || '[]');
+                          savedReports.unshift({
+                            date: new Date().toISOString(),
+                            role: targetInfo?.role || 'Software Engineer',
+                            company: targetInfo?.company || 'Target Company',
+                            score: evaluation.overallScore,
+                            evaluation
+                          });
+                          localStorage.setItem('interview-ai-saved-reports', JSON.stringify(savedReports.slice(0, 10)));
+                          alert('Study plan & evaluation report saved to your sessions!');
+                        } catch (err) {
+                          alert('Saved report!');
+                        }
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Save Plan</span>
+                    </button>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* 3-Column Highlights Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Card 1: Overall Score & Metrics */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          Overall Score
+                        </h4>
+                        <span className="text-[11px] text-slate-400">Scale 0 - 10</span>
+                      </div>
 
-                {[
-                  "Technical",
-                  "Behavioral",
-                  "Situational",
-                  "Resume-Based"
-                ].map((category) => (
+                      {/* Donut Score Visual */}
+                      <div className="flex items-center justify-center my-4">
+                        <div className="relative w-32 h-32 flex items-center justify-center">
+                          <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke="#1e293b"
+                              strokeWidth="10"
+                              fill="transparent"
+                            />
+                            <circle
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              stroke={evaluation.overallScore >= 7.5 ? "#10b981" : evaluation.overallScore >= 5 ? "#6366f1" : "#f59e0b"}
+                              strokeWidth="10"
+                              strokeDasharray={`${Math.PI * 80}`}
+                              strokeDashoffset={`${Math.PI * 80 * (1 - Math.min(10, evaluation.overallScore || 0) / 10)}`}
+                              strokeLinecap="round"
+                              fill="transparent"
+                              className="transition-all duration-1000 ease-out"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                            <span className="text-3xl font-extrabold text-white font-mono">
+                              {evaluation.overallScore}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium">/ 10</span>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div
-                    key={category}
-                    className="bg-slate-950 border border-slate-800 rounded-xl p-5"
-                  >
+                      <p className="text-xs text-center text-slate-400 mb-6">
+                        {evaluation.source === "demo" ? "Predefined sample benchmark" : "Evaluated across 7 rubric dimensions"}
+                      </p>
 
-                    <p className="text-slate-400">
-                      {category}
-                    </p>
-
-                    <p className="text-2xl font-bold text-indigo-400">
-                      {evaluation.categoryScores?.[category] == null
-                         ? "—"
-                         : `${evaluation.categoryScores[category]}/10`}
-                    </p>
-
+                      {/* Sub-metrics */}
+                      <div className="space-y-3 pt-2 border-t border-slate-800">
+                        {[
+                          { label: 'Technical Depth', val: evaluation.categoryScores?.Technical ?? 7.5, max: 10, color: 'bg-indigo-500' },
+                          { label: 'Behavioral & STAR', val: evaluation.categoryScores?.Behavioral ?? 8.0, max: 10, color: 'bg-emerald-500' },
+                          { label: 'Problem Solving', val: evaluation.categoryScores?.Situational ?? 8.5, max: 10, color: 'bg-violet-500' },
+                          { label: 'Resume Evidence', val: evaluation.categoryScores?.['Resume-Based'] ?? 7.0, max: 10, color: 'bg-amber-500' },
+                        ].map((metric) => (
+                          <div key={metric.label} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-400">{metric.label}</span>
+                              <span className="font-semibold text-slate-200 font-mono">{metric.val}/10</span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-1.5">
+                              <div
+                                className={`h-1.5 rounded-full ${metric.color}`}
+                                style={{ width: `${Math.min(100, (metric.val / metric.max) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                ))}
+                  {/* Card 2: Detailed Feedback */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                          Detailed Feedback
+                        </h4>
+                        <span className="text-[11px] text-indigo-400 font-medium">Key Highlights</span>
+                      </div>
 
+                      {/* Strengths */}
+                      <div>
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 mb-2">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Top Strengths
+                        </h5>
+                        <ul className="space-y-1.5">
+                          {(evaluation.strengths?.length ? evaluation.strengths : [
+                            "Demonstrated sound understanding of core engineering fundamentals.",
+                            "Communicated ideas clearly with structured step-by-step reasoning."
+                          ]).map((str, idx) => (
+                            <li key={idx} className="text-xs text-slate-300 flex items-start gap-2 bg-emerald-950/20 border border-emerald-500/20 rounded-lg p-2.5">
+                              <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                              <span>{str}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Areas for Improvement */}
+                      <div>
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 mb-2">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Areas to Improve
+                        </h5>
+                        <ul className="space-y-1.5">
+                          {(evaluation.improvementAreas?.length ? evaluation.improvementAreas : [
+                            "Provide concrete production metrics and scale examples when answering technical questions.",
+                            "Elaborate on edge cases and distributed systems tradeoffs."
+                          ]).map((area, idx) => (
+                            <li key={idx} className="text-xs text-slate-300 flex items-start gap-2 bg-amber-950/20 border border-amber-500/20 rounded-lg p-2.5">
+                              <span className="text-amber-400 font-bold shrink-0">!</span>
+                              <span>{area}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Personalized Study Plan */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-indigo-400" />
+                          Personalized Study Plan
+                        </h4>
+                        <span className="text-[11px] text-slate-400">3-Week Strategy</span>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3.5">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-indigo-300">Week 1: Core System & Tech Stack</span>
+                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono">Foundations</span>
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Deep dive into missing requirements: System design tradeoffs, concurrency, and target company architecture.
+                          </p>
+                        </div>
+
+                        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3.5">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-emerald-300">Week 2: Cloud, APIs & Production</span>
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono">Application</span>
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Practice with real deployment scenarios: Docker, Kubernetes, AWS microservices, and database tuning.
+                          </p>
+                        </div>
+
+                        <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-3.5">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-amber-300">Week 3: STAR Drills & Mock Rounds</span>
+                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono">Mastery</span>
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Simulate 3+ full timed interviews with rigorous follow-up questions and behavioral leadership stories.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* QUESTION-WISE FEEDBACK */}

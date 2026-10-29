@@ -125,27 +125,43 @@ export default function ResumeUploader({ onParse, isLoading }) {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-      {/* Heading & Fast Sample Loader */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-indigo-400" />
-            Interview Preparation & Target Role Gap Analyzer
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Specify your target company and role, upload your resume, and generate an unbiased gap analysis & study roadmap.
-          </p>
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+      {/* Top Banner & Stepper matching Screen 2 */}
+      <div className="border-b border-slate-800 pb-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Let's get started!</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Set your target role and upload your resume to begin your AI-powered analysis and personalized study plan.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLoadSample}
+            className="flex items-center space-x-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition whitespace-nowrap self-start sm:self-auto"
+          >
+            <Sparkles className="w-4 h-4 text-indigo-400" />
+            <span>Load Sample (Google SDE)</span>
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleLoadSample}
-          className="flex items-center space-x-2 text-xs font-semibold px-3.5 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition whitespace-nowrap self-start sm:self-auto"
-        >
-          <Sparkles className="w-4 h-4 text-indigo-400" />
-          <span>Load Sample (Google SDE)</span>
-        </button>
+        {/* 3-Step Indicator */}
+        <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+            <span className="text-xs font-semibold text-white">Target Setup</span>
+          </div>
+          <div className="w-12 h-0.5 bg-slate-700" />
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold flex items-center justify-center">2</span>
+            <span className="text-xs font-semibold text-slate-400">Resume Upload</span>
+          </div>
+          <div className="w-12 h-0.5 bg-slate-800" />
+          <div className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-500 border border-slate-800 text-xs font-bold flex items-center justify-center">3</span>
+            <span className="text-xs font-semibold text-slate-500">Review & Analyze</span>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
