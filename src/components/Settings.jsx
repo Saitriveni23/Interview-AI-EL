@@ -19,8 +19,7 @@ function Toggle({ value, onChange }) {
   );
 }
 
-export default function Settings() {
-  const [darkMode, setDarkMode] = useState(true);
+export default function Settings({ darkMode = true, onToggleDarkMode }) {
   const [notifications, setNotifications] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
   const [clearConfirm, setClearConfirm] = useState(false);
@@ -33,6 +32,7 @@ export default function Settings() {
     }
     localStorage.removeItem('interview-ai-session');
     localStorage.removeItem('interview-ai-sessions');
+    localStorage.removeItem('interview-ai-saved-reports');
     localStorage.removeItem('interview-ai-completed-tasks');
     window.location.reload();
   };
@@ -60,7 +60,7 @@ export default function Settings() {
                 <p className="text-xs text-slate-400">Use dark theme throughout the app</p>
               </div>
             </div>
-            <Toggle value={darkMode} onChange={setDarkMode} />
+            <Toggle value={darkMode} onChange={onToggleDarkMode || (() => {})} />
           </div>
 
           <div className="flex items-center justify-between py-3.5">

@@ -562,18 +562,6 @@ export default function InterviewPanel({
     Array.isArray(candidateSkills) ? candidateSkills : []
   );
 
-  // Show mode selection screen first
-  if (!interviewMode) {
-    return (
-      <ModeSelectionScreen
-        targetInfo={targetInfo}
-        onSelectMode={(mode) => {
-          setInterviewMode(mode);
-        }}
-      />
-    );
-  }
-
   // ==========================================
   // 8. LOAD INTERVIEW QUESTIONS (triggered once mode is chosen)
   // ==========================================
@@ -833,6 +821,18 @@ export default function InterviewPanel({
   // 12. LOADING SCREEN
   // ==========================================
 
+  // Show mode selection screen first
+  if (!interviewMode) {
+    return (
+      <ModeSelectionScreen
+        targetInfo={targetInfo}
+        onSelectMode={(mode) => {
+          setInterviewMode(mode);
+        }}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-white">
@@ -856,14 +856,23 @@ export default function InterviewPanel({
   return (
     <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-white">
 
-      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2 flex-wrap">
-        <span>Adaptive AI Mock Interview</span>
-        {targetInfo?.company && (
-          <span className="text-indigo-400 font-normal text-lg">
-            • {targetInfo.role || 'Software Engineer'} @ {targetInfo.company}
-          </span>
-        )}
-      </h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-2xl font-bold flex items-center gap-2 flex-wrap">
+          <span>Adaptive AI Mock Interview</span>
+          {targetInfo?.company && (
+            <span className="text-indigo-400 font-normal text-lg">
+              • {targetInfo.role || 'Software Engineer'} @ {targetInfo.company}
+            </span>
+          )}
+        </h2>
+        <button
+          onClick={() => setInterviewMode(null)}
+          className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 transition"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          <span>Change Mode</span>
+        </button>
+      </div>
 
       <p className="text-slate-400 mb-6 text-sm">
         Complete 7 interview questions customized for {targetInfo?.company ? `${targetInfo.company} hiring benchmarks` : 'technical hiring evaluations'}, covering technical depth, behavioral scenarios, and resume verification.

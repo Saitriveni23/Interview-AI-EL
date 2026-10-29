@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
@@ -240,6 +240,44 @@ function UploadPage({
 }
 
 // ============================================================
+// Dedicated Interview Prep Page (Screen 5)
+// ============================================================
+function InterviewPage({ parseResult, onNavigate }) {
+  const targetInfo = parseResult?.targetInfo || { company: 'Google', role: 'Full Stack Developer' };
+  const candidateSkills = parseResult?.candidateProfile?.skills || ['JavaScript', 'React', 'Node.js', 'SQL', 'Python'];
+  const redactedResumeText = parseResult?.redactedText || '';
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-6xl mx-auto p-6 sm:p-8 space-y-6">
+        {!parseResult && (
+          <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-bold text-indigo-300">💡 Standard Benchmark Practice Mode</span>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Practicing with standard {targetInfo.role} @ {targetInfo.company} interview questions. Upload your resume anytime to generate questions personalized to your actual experience and skill gaps.
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate('upload')}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl whitespace-nowrap transition shadow-lg shadow-indigo-600/20"
+            >
+              Upload Resume →
+            </button>
+          </div>
+        )}
+
+        <InterviewPanel
+          targetInfo={targetInfo}
+          candidateSkills={candidateSkills}
+          redactedResumeText={redactedResumeText}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // ROOT APP
 // ============================================================
 export default function App() {
@@ -247,6 +285,29 @@ export default function App() {
   const [activeResultTab, setActiveResultTab] = useState('redaction');
   const [parseResult, setParseResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Theme state persisted in localStorage
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      const s = localStorage.getItem('interview-ai-dark-mode');
+      return s !== null ? JSON.parse(s) : true;
+    } catch (_) { return true; }
+  });
+
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.remove('light-mode');
+    } else {
+      document.body.classList.add('light-mode');
+    }
+  }, [darkMode]);
+
+  const handleToggleDarkMode = (val) => {
+    setDarkMode(val);
+    try {
+      localStorage.setItem('interview-ai-dark-mode', JSON.stringify(val));
+    } catch (_) {}
+  };
 
   // Persist sessions list in localStorage.
   const [sessions, setSessions] = useState(() => {
@@ -332,8 +393,7 @@ export default function App() {
   // ── Sidebar navigation ──
   const handleNavigate = (page) => {
     if (page === 'interview') {
-      setActiveResultTab('interview');
-      setActivePage('upload');
+      setActivePage('interview');
     } else if (page === 'upload') {
       if (parseResult) {
         setActiveResultTab('skills');
@@ -365,10 +425,22 @@ export default function App() {
         );
 
       case 'settings':
-        return <Settings />;
+        return (
+          <Settings
+            darkMode={darkMode}
+            onToggleDarkMode={handleToggleDarkMode}
+          />
+        );
+
+      case 'interview':
+        return (
+          <InterviewPage
+            parseResult={parseResult}
+            onNavigate={handleNavigate}
+          />
+        );
 
       case 'upload':
-      case 'interview':
       default:
         return (
           <UploadPage
