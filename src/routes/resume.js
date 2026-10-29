@@ -6,6 +6,7 @@ import { SkillExtractor } from '../services/skillExtractor.js';
 import { LLMService } from '../services/llmService.js';
 import { generateGeminiQuestions } from '../services/geminiService.js';
 import { evaluateInterview } from '../services/interviewEvaluationService.js';
+import { getPresetJobDescription } from '../data/companyRolePresets.js';
 
 const router = Router();
 
@@ -30,7 +31,10 @@ router.post(
   async (req, res) => {
     try {
       let rawText = req.body.resumeText || '';
-      const jobDescription = req.body.jobDescription || '';
+      const targetCompany = (req.body.targetCompany || 'Target Tech Company').trim();
+      const targetRole = (req.body.targetRole || 'Full Stack Developer').trim();
+      const experienceLevel = (req.body.experienceLevel || 'Mid-Level (3-5 yrs)').trim();
+      let jobDescription = req.body.jobDescription || '';
 
       if (req.file) {
         rawText = await parsePdfToText(req.file.buffer);
@@ -41,6 +45,11 @@ router.post(
           success: false,
           error: 'Please provide a valid PDF resume or resume text.'
         });
+      }
+
+      // Auto-populate target role job description if empty or using company-role preset
+      if (!jobDescription.trim()) {
+        jobDescription = getPresetJobDescription(targetCompany, targetRole, experienceLevel);
       }
 
       const redactionResult = redactor.redact(rawText);
@@ -54,21 +63,35 @@ router.post(
         jobDescription
       );
 
-      // Preserve the existing initial study-plan behavior.
+      const targetInfo = {
+        company: targetCompany,
+        role: targetRole,
+        experienceLevel
+      };
+
+      // Generate personalized study plan targeting the company and role
       const studyPlan = await llmService.generateStudyPlan(
         candidateProfile,
         deltaAnalysis,
-        4
+        4,
+        10,
+        targetInfo
       );
 
       return res.json({
         success: true,
+        targetInfo,
         originalText: rawText,
         redactedText: redactionResult.redactedText,
         auditLog: redactionResult.auditLog,
         stats: redactionResult.stats,
         candidateProfile,
-        deltaAnalysis,
+        deltaAnalysis: {
+          ...deltaAnalysis,
+          targetCompany,
+          targetRole,
+          experienceLevel
+        },
         studyPlan,
         processedAt: new Date().toISOString()
       });
@@ -94,7 +117,8 @@ router.post('/generate-study-plan', async (req, res) => {
       candidateProfile,
       deltaAnalysis,
       preferredStudyWeeks,
-      weeklyStudyHours
+      weeklyStudyHours,
+      targetInfo
     } = req.body;
 
     if (
@@ -138,7 +162,8 @@ router.post('/generate-study-plan', async (req, res) => {
       candidateProfile,
       deltaAnalysis,
       selectedWeeks,
-      hoursPerWeek
+      hoursPerWeek,
+      targetInfo
     );
 
     return res.json({

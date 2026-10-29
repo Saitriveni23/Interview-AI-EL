@@ -254,13 +254,37 @@ function buildResumeQuestions(resumeText = "") {
 }
 
 // ==========================================
+// ROLE-TARGETED QUESTIONS
+// Generates role/company-specific questions
+// so the mock interview reflects the actual
+// target job, not just the candidate's skills.
+// ==========================================
+
+function buildRoleTargetedQuestions(targetInfo) {
+  if (!targetInfo?.role || targetInfo.role === 'Software Engineer') return [];
+  const { role, company, experienceLevel } = targetInfo;
+  const companyCtx = company && company !== 'Target Company' ? ` at ${company}` : '';
+  const levelCtx = experienceLevel ? ` (${experienceLevel})` : '';
+  return [
+    {
+      skill: role,
+      difficulty: 'Intermediate',
+      question: `As a candidate for the ${role} position${companyCtx}${levelCtx}, describe how you would approach designing and shipping a new feature — from requirement gathering through to production deployment. What tools, processes, and practices would you follow?`,
+      source: 'role-targeted',
+      category: 'Technical'
+    }
+  ];
+}
+
+// ==========================================
 // 6. SELECT EXACTLY 7 QUESTIONS
 // ==========================================
 
 function buildInterviewQuestions(
   localQuestions = [],
   geminiQuestions = [],
-  redactedResumeText = ""
+  redactedResumeText = "",
+  roleTargetedQuestions = []
 ) {
   const technicalQuestions = [];
   const usedQuestions = new Set();
@@ -294,6 +318,10 @@ function buildInterviewQuestions(
       category: "Technical"
     });
   }
+
+  // Role-targeted questions take first priority so they appear
+  // in the interview regardless of local question bank coverage.
+  roleTargetedQuestions.forEach(addQuestion);
 
   localQuestions.forEach(addQuestion);
 
@@ -393,6 +421,7 @@ function buildDemoEvaluation(answers) {
 // ==========================================
 
 export default function InterviewPanel({
+  targetInfo,
   candidateSkills = [],
   redactedResumeText = ""
 }) {
@@ -523,7 +552,8 @@ export default function InterviewPanel({
       const finalQuestions = buildInterviewQuestions(
         localQuestions,
         geminiQuestions,
-        redactedResumeText
+        redactedResumeText,
+        buildRoleTargetedQuestions(targetInfo)
       );
 
       setQuestions(finalQuestions);
@@ -694,13 +724,17 @@ export default function InterviewPanel({
   return (
     <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 text-white">
 
-      <h2 className="text-2xl font-bold mb-4">
-        Adaptive AI Mock Interview
+      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2 flex-wrap">
+        <span>Adaptive AI Mock Interview</span>
+        {targetInfo?.company && (
+          <span className="text-indigo-400 font-normal text-lg">
+            • {targetInfo.role || 'Software Engineer'} @ {targetInfo.company}
+          </span>
+        )}
       </h2>
 
-      <p className="text-slate-400 mb-6">
-        Complete 7 interview questions covering technical knowledge,
-        behavioral skills, situational problem-solving, and resume experience.
+      <p className="text-slate-400 mb-6 text-sm">
+        Complete 7 interview questions customized for {targetInfo?.company ? `${targetInfo.company} hiring benchmarks` : 'technical hiring evaluations'}, covering technical depth, behavioral scenarios, and resume verification.
       </p>
 
       {/* QUESTION GENERATION WARNING */}
@@ -771,7 +805,9 @@ export default function InterviewPanel({
                  ? "Your Redacted Resume"
                  : questions[currentQuestion].source === "general"
                    ? "General Reflection"
-                   : "Local Question Bank"}
+                   : questions[currentQuestion].source === "role-targeted"
+                     ? `Role-Targeted (${targetInfo?.role || 'Engineering'})`
+                     : "Local Question Bank"}
           </p>
 
           {/* QUESTION */}

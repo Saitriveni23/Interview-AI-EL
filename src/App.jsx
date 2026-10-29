@@ -11,6 +11,34 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('redaction');
 
+  // Check localStorage for a previously saved session.
+  const [savedSession, setSavedSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem('interview-ai-session');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) { return null; }
+  });
+
+  const handleDismissSession = () => {
+    setSavedSession(null);
+    localStorage.removeItem('interview-ai-session');
+  };
+
+  const handleRestoreSession = () => {
+    if (!savedSession) return;
+    setParseResult({
+      success: true,
+      targetInfo: savedSession.targetInfo || {},
+      candidateProfile: savedSession.candidateProfile,
+      deltaAnalysis: savedSession.deltaAnalysis,
+      studyPlan: savedSession.studyPlan || null,
+      redactedText: '',
+      stats: { totalRedactions: 0 }
+    });
+    setSavedSession(null);
+    setActiveTab('skills');
+  };
+
   // ==========================================
   // 1. RESUME UPLOAD AND PROCESSING
   // ==========================================
@@ -60,6 +88,33 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
 
       <Header />
+
+      {/* Previous session restore banner — shown before a new resume is uploaded */}
+      {savedSession && !parseResult && (
+        <div className="bg-indigo-950/70 border-b border-indigo-500/30 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-indigo-300 font-bold">🔖 Previous Session Detected</span>
+            <span className="text-slate-400 text-xs">
+              {savedSession.targetInfo?.role || 'Resume'}{savedSession.targetInfo?.company ? ` @ ${savedSession.targetInfo.company}` : ''}
+              {savedSession.savedAt ? ` • Saved ${new Date(savedSession.savedAt).toLocaleDateString()}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRestoreSession}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition"
+            >
+              Resume Session
+            </button>
+            <button
+              onClick={handleDismissSession}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
@@ -166,6 +221,7 @@ export default function App() {
             {activeTab === 'skills' && (
 
               <SkillParserView
+                targetInfo={parseResult.targetInfo}
                 candidateProfile={parseResult.candidateProfile}
                 deltaAnalysis={parseResult.deltaAnalysis}
                 studyPlan={parseResult.studyPlan}
@@ -181,6 +237,7 @@ export default function App() {
             {activeTab === 'interview' && (
 
               <InterviewPanel
+                targetInfo={parseResult.targetInfo}
                 candidateSkills={
                   parseResult.candidateProfile?.skills || []
                 }

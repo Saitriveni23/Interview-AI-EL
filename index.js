@@ -6,7 +6,7 @@ import { redactResume } from './services/redactor.js';
 import { SAMPLE_RESUMES } from './data/sampleResumes.js';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Multer in-memory storage for PDF uploads
 const upload = multer({

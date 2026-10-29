@@ -7,6 +7,7 @@
  */
 
 import { GoogleGenAI } from '@google/genai';
+import { getStudyMaterialForSkill, getStudyMaterialsForSkills } from '../data/studyMaterials.js';
 
 export class LLMService {
 
@@ -74,7 +75,8 @@ export class LLMService {
     candidateProfile,
     deltaAnalysis,
     preferredStudyWeeks = 4,
-    weeklyStudyHours = 10
+    weeklyStudyHours = 10,
+    targetInfo = null
   ) {
 
     const existingSkills = candidateProfile.skills || [];
@@ -151,6 +153,14 @@ export class LLMService {
     const domain =
       candidateProfile.domainCategory || 'Technical Skills';
 
+    const targetCompany = (targetInfo?.company || deltaAnalysis?.targetCompany || '').trim();
+    const targetRole = (targetInfo?.role || deltaAnalysis?.targetRole || domain || 'Software Engineering').trim();
+    const experienceLevel = (targetInfo?.experienceLevel || deltaAnalysis?.experienceLevel || '').trim();
+
+    const planTitle = targetCompany
+      ? `Personalized Up-Skilling Roadmap: ${targetRole} @ ${targetCompany}`
+      : `Personalized Technical Study Plan - ${targetRole}`;
+
     // Shared duration information.
     const durationInfo = {
       preferredStudyWeeks: safePreferredWeeks,
@@ -158,7 +168,10 @@ export class LLMService {
       minimumStudyWeeks,
       finalStudyWeeks,
       estimatedLearningHours,
-      durationAdjusted
+      durationAdjusted,
+      targetCompany,
+      targetRole,
+      experienceLevel
     };
 
     // ------------------------------------
@@ -167,7 +180,10 @@ export class LLMService {
 
     if (!deltaAnalysis.requiredSkills?.length) {
       return {
-        title: 'Personalized Technical Study Plan',
+        title: planTitle,
+        targetCompany,
+        targetRole,
+        experienceLevel,
         targetMatchScore,
         ...durationInfo,
         summary:
@@ -186,22 +202,30 @@ export class LLMService {
         { length: finalStudyWeeks },
         (_, index) => ({
           week: `Week ${index + 1}`,
-          topic: 'Technical Interview Preparation',
+          topic: `Technical Interview Preparation & System Design`,
           focusAreas: [
-            'Review concepts related to the target role.',
-            'Practice explaining technical projects.',
+            `Review ${targetRole} architecture patterns.`,
+            `Practice explaining projects matching ${targetCompany || 'target'} standards.`,
             'Solve technical interview questions.'
           ],
-          estimatedHours: safeWeeklyHours
+          estimatedHours: safeWeeklyHours,
+          studyMaterial: getStudyMaterialForSkill('System Design')
         })
       );
 
       return {
-        title: 'Technical Interview Preparation Plan',
+        title: targetCompany
+          ? `Interview Readiness Plan: ${targetRole} @ ${targetCompany}`
+          : 'Technical Interview Preparation Plan',
+        targetCompany,
+        targetRole,
+        experienceLevel,
         targetMatchScore,
         ...durationInfo,
-        summary:
-          'All identified technical skills match the job requirements. Focus on interview preparation.',
+        summary: targetCompany
+          ? `All identified technical skills match the requirements for ${targetRole} at ${targetCompany}! Focus on system design and mock interviews.`
+          : 'All identified technical skills match the job requirements. Focus on interview preparation.',
+        skillMaterials: getStudyMaterialsForSkills(['System Design']),
         recommendedModules: modules
       };
     }
@@ -415,11 +439,16 @@ const fallbackPlan = () => {
           practicalActivity
         ];
 
+        const material =
+          getStudyMaterialForSkill(firstUnit.skill) ||
+          getStudyMaterialForSkill(topic);
+
         return {
           week: `Week ${weekIndex + 1}`,
           topic,
           focusAreas: activities,
-          estimatedHours: safeWeeklyHours
+          estimatedHours: safeWeeklyHours,
+          studyMaterial: material
         };
       }
 
@@ -478,22 +507,35 @@ const fallbackPlan = () => {
         week: `Week ${weekIndex + 1}`,
         topic: `${skill} - ${practice.title}`,
         focusAreas: practice.activities,
-        estimatedHours: safeWeeklyHours
+        estimatedHours: safeWeeklyHours,
+        studyMaterial: getStudyMaterialForSkill(skill)
       };
     }
   );
 
+  const summary = targetCompany
+    ? `Targeting ${targetRole} at ${targetCompany} (${experienceLevel || 'Engineering'}). This ${finalStudyWeeks}-week preparation plan bridges identified skill gaps: ${missingSkills.join(', ')}.`
+    : `This ${finalStudyWeeks}-week preparation plan covers the identified skill gaps: ${missingSkills.join(', ')}.`;
+
   return {
-    title: `Personalized Technical Study Plan - ${domain}`,
+    title: planTitle,
+    targetCompany,
+    targetRole,
+    experienceLevel,
     targetMatchScore,
     ...durationInfo,
     isFallback: true,
-    summary:
-      `This ${finalStudyWeeks}-week preparation plan covers ` +
-      `the identified skill gaps: ${missingSkills.join(', ')}.`,
+    summary,
+    skillMaterials: getStudyMaterialsForSkills(missingSkills),
     recommendedModules: modules
   };
 };
+
+  // Compute fallbackSummary here so it is accessible in both
+  // the fallbackPlan closure above and the Gemini return path below.
+  const fallbackSummary = targetCompany
+    ? `Targeting ${targetRole} at ${targetCompany} (${experienceLevel || 'Engineering'}). This ${finalStudyWeeks}-week preparation plan bridges identified skill gaps: ${missingSkills.join(', ')}.`
+    : `This ${finalStudyWeeks}-week preparation plan covers the identified skill gaps: ${missingSkills.join(', ')}.`;
     // ------------------------------------
     // STEP 7: CHECK GEMINI API KEY
     // ------------------------------------
@@ -692,11 +734,21 @@ for (let attempt = 1; attempt <= 3; attempt++) {
             );
           }
 
+          const matchedMaterial =
+            getStudyMaterialForSkill(module.topic) ||
+            getStudyMaterialForSkill(
+              missingSkills.find((s) =>
+                module.topic.toLowerCase().includes(s.toLowerCase())
+              )
+            ) ||
+            getStudyMaterialForSkill(missingSkills[index % missingSkills.length]);
+
           return {
             week: `Week ${index + 1}`,
             topic: module.topic,
             focusAreas,
-            estimatedHours: safeWeeklyHours
+            estimatedHours: safeWeeklyHours,
+            studyMaterial: matchedMaterial
           };
         }
       );
@@ -707,7 +759,10 @@ for (let attempt = 1; attempt <= 3; attempt++) {
 
       console.log("✅ Gemini API successfully generated the personalized study plan!");
       return {
-        title: `Personalized Technical Study Plan - ${domain}`,
+        title: planTitle,
+        targetCompany,
+        targetRole,
+        experienceLevel,
         targetMatchScore,
         ...durationInfo,
         isFallback: false,
@@ -715,7 +770,8 @@ for (let attempt = 1; attempt <= 3; attempt++) {
           typeof plan.summary === 'string' &&
           plan.summary.trim()
             ? plan.summary
-            : `Focus on developing ${missingSkills.join(', ')}.`,
+            : fallbackSummary,
+        skillMaterials: getStudyMaterialsForSkills(missingSkills),
         recommendedModules: modules
       };
 
