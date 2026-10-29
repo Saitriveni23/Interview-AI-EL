@@ -4,12 +4,9 @@ import {
   FileText,
   PlayCircle,
   Settings,
-  Search,
   LogOut,
   Zap,
   Clock,
-  BookOpen,
-  ChevronRight
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -34,14 +31,6 @@ export default function Sidebar({ activePage, onNavigate, parseResult }) {
             <span className="text-sm font-bold text-white block leading-tight">Interview AI</span>
             <span className="text-[10px] text-slate-500">Powered by Gemini</span>
           </div>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="px-3 py-3 border-b border-slate-800">
-        <div className="flex items-center gap-2 bg-slate-950/60 border border-slate-700/50 rounded-lg px-3 py-2 cursor-pointer hover:border-slate-600 transition">
-          <Search className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-          <span className="text-slate-500 text-xs">Search...</span>
         </div>
       </div>
 

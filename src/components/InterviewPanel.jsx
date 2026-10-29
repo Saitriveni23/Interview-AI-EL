@@ -1180,171 +1180,67 @@ export default function InterviewPanel({
 
         <>
 
-          <div className="bg-emerald-950/30 border border-emerald-800 rounded-xl p-6 mb-6">
-
-            <h3 className="text-2xl font-bold text-emerald-400 mb-3">
-              Interview Completed!
-            </h3>
-
-            <p className="text-slate-300">
-              You successfully answered {answers.length} questions.
-            </p>
-
-          </div>
-
-          {evaluation?.source === "demo" && (
-            <div className="bg-amber-950/40 border border-amber-500 rounded-xl p-4 mb-6">
-              <strong className="text-amber-300">DEMO MODE — SAMPLE RESULTS ONLY</strong>
-              <p className="text-slate-200 mt-2">No Gemini evaluation or resume verification was performed.</p>
-              <button onClick={handleEvaluate} disabled={evaluating}
-                className="mt-3 px-4 py-2 rounded-lg bg-indigo-600 disabled:opacity-50">
-                {evaluating ? "Requesting Gemini..." : "Try Real Gemini Evaluation"}
-              </button>
-              {evaluationError && <p role="alert" className="text-amber-300 mt-2">{evaluationError}</p>}
-            </div>
-          )}
-
-          {/* INTERVIEW SUMMARY */}
-
-          <h3 className="text-xl font-semibold mb-4">
-            Interview Summary
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800">
-
-              <p className="text-slate-400 text-sm mb-2">
-                Technical Questions
-              </p>
-
-              <p className="text-2xl font-bold text-indigo-400">
-                {answers.filter(
-                  (item) => item.category === "Technical"
-                ).length} / 3
-              </p>
-
-            </div>
-
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800">
-
-              <p className="text-slate-400 text-sm mb-2">
-                Behavioral Questions
-              </p>
-
-              <p className="text-2xl font-bold text-indigo-400">
-                {answers.filter(
-                  (item) => item.category === "Behavioral"
-                ).length} / 1
-              </p>
-
-            </div>
-
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800">
-
-              <p className="text-slate-400 text-sm mb-2">
-                Situational Questions
-              </p>
-
-              <p className="text-2xl font-bold text-indigo-400">
-                {answers.filter(
-                  (item) => item.category === "Situational"
-                ).length} / 1
-              </p>
-
-            </div>
-
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800">
-              <p className="text-slate-400 text-sm mb-2">Resume-Based Questions</p>
-              <p className="text-2xl font-bold text-indigo-400">
-                {answers.filter((item) => item.category === "Resume-Based").length} / 2
-              </p>
-            </div>
-
-          </div>
-
-          {/* RECORDED ANSWERS */}
-
-          <h3 className="text-xl font-semibold mb-4">
-            Your Interview Responses
-          </h3>
-
-          <div className="space-y-4 mb-6">
-
-            {answers.map((item, index) => (
-              <div
-                key={index}
-                className="bg-slate-950 border border-slate-800 rounded-xl p-5"
-              >
-
-                <p className="text-indigo-400 text-sm mb-2">
-                  Question {item.questionNumber} — {item.category}
-                </p>
-
-                <h4 className="font-semibold mb-3">
-                  {item.question}
-                </h4>
-
-                <p className="text-slate-300 whitespace-pre-wrap">
-                  {item.answer}
-                </p>
-
-              </div>
-            ))}
-
-          </div>
-
           {/* ====================================== */}
-          {/* AI EVALUATION BUTTON */}
+          {/* PRE-EVALUATION TRIGGER & REPORT BANNER */}
           {/* ====================================== */}
-
           {evaluation?.status !== "completed" && (
+            <div className="space-y-6 mb-6">
+              <div className="bg-gradient-to-r from-emerald-950/40 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-3">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      All {answers.length} Questions Answered
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">
+                      Ready for AI Performance Evaluation
+                    </h3>
+                    <p className="text-slate-400 text-sm max-w-xl">
+                      Your responses across Technical, Behavioral, and Resume-Based questions have been recorded. Generate your score report, rubric feedback, and 3-week study roadmap.
+                    </p>
+                  </div>
 
-            <div className="bg-indigo-950/30 border border-indigo-800 rounded-xl p-5 mb-6">
+                  <button
+                    onClick={handleEvaluate}
+                    disabled={evaluating}
+                    className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-xl shadow-indigo-600/30 transition flex items-center gap-2 flex-shrink-0 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>
+                      {evaluating
+                        ? "Evaluating Answers..."
+                        : evaluation?.status === "unavailable"
+                        ? "Retry AI Evaluation"
+                        : "Generate AI Evaluation & Report"}
+                    </span>
+                  </button>
+                </div>
 
-              <h3 className="text-xl font-semibold text-indigo-300 mb-2">
-                AI Interview Evaluation
-              </h3>
+                {evaluationError && (
+                  <p className="text-amber-400 mt-4 text-xs font-medium" role="alert">
+                    {evaluationError}
+                  </p>
+                )}
+              </div>
 
-              <p className="text-slate-300 mb-4">
-                Your seven responses have been recorded.
-                Click below to request question-wise AI feedback
-                and a final score.
-              </p>
-
-              <button
-                onClick={handleEvaluate}
-                disabled={evaluating}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-xl font-semibold"
-              >
-                {evaluating
-                  ? "Evaluating your answers..."
-                  : evaluation?.status === "unavailable"
-                    ? "Retry AI Evaluation"
-                    : "Generate AI Evaluation & Final Report"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDemoEvaluation}
-                disabled={evaluating}
-                className="ml-0 sm:ml-3 mt-3 sm:mt-0 px-6 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-xl font-semibold"
-              >
-                Show Sample Report (Demo Mode)
-              </button>
-              <p className="mt-3 text-sm text-amber-300">
-                Demo Mode displays predefined example scores; it does not evaluate your answers.
-              </p>
-
-              {evaluationError && (
-                <p
-                  className="text-amber-400 mt-4"
-                  role="alert"
-                >
-                  {evaluationError}
-                </p>
-              )}
-
+              {/* Review Recorded Answers (Collapsible) */}
+              <details className="group bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden transition">
+                <summary className="px-6 py-4 cursor-pointer font-semibold text-sm text-slate-300 hover:text-white flex items-center justify-between select-none">
+                  <span>Review Your Recorded Answers ({answers.length})</span>
+                  <span className="text-xs text-indigo-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="p-6 pt-2 space-y-4 border-t border-slate-800/60">
+                  {answers.map((item, index) => (
+                    <div key={index} className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                      <p className="text-indigo-400 text-xs font-semibold mb-1">
+                        Question {item.questionNumber} • {item.category}
+                      </p>
+                      <h4 className="font-semibold text-white text-sm mb-2">{item.question}</h4>
+                      <p className="text-slate-300 text-xs whitespace-pre-wrap leading-relaxed">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
             </div>
           )}
 

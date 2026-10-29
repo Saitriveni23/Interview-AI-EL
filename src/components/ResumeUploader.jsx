@@ -268,7 +268,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
               <span>
                 {showCustomJD
                   ? 'Hide Job Requirements Editor'
-                  : 'View or Customize Target Job Description & Tech Stack'}
+                  : 'Customize Job Description (Optional)'}
               </span>
               {showCustomJD ? (
                 <ChevronUp className="w-3.5 h-3.5 ml-1" />

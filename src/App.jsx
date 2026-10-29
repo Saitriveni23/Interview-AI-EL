@@ -177,7 +177,7 @@ function UploadPage({
                 }`}
               >
                 <ShieldAlert className="w-4 h-4" />
-                <span>Layer 1: Bias Redaction & Privacy Shield</span>
+                <span>Privacy Shield</span>
                 <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-indigo-300 text-[10px]">
                   {parseResult.stats?.totalRedactions ?? 0} Redacted
                 </span>
@@ -192,7 +192,7 @@ function UploadPage({
                 }`}
               >
                 <Award className="w-4 h-4" />
-                <span>Skill Parsing, Delta & Layer 2 Governance</span>
+                <span>Skills & Gap Analysis</span>
                 <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-emerald-300 text-[10px]">
                   {parseResult.deltaAnalysis?.matchPercentage ?? 0}% Match
                 </span>
@@ -207,7 +207,7 @@ function UploadPage({
                 }`}
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Adaptive AI Mock Interview</span>
+                <span>Mock Interview</span>
               </button>
             </div>
 
