@@ -73,11 +73,11 @@ export default function Sidebar({ activePage, onNavigate, parseResult }) {
         })}
       </nav>
 
-      {/* Upgrade hint */}
+      {/* Plan badge */}
       <div className="px-3 pb-3">
         <div className="bg-indigo-950/60 border border-indigo-500/20 rounded-xl p-3 text-center">
-          <p className="text-[10px] text-indigo-300 font-semibold">Free Plan</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Add Gemini API key for AI features</p>
+          <p className="text-[10px] text-indigo-300 font-semibold">AI Interview Assistant</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Adaptive preparation active</p>
         </div>
       </div>
 

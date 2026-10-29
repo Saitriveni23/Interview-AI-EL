@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Moon, Bell, Trash2, Shield, Info, Key } from 'lucide-react';
+import { Moon, Bell, Trash2, Shield, Info, Sparkles, User, Building2, Briefcase, GraduationCap, Check } from 'lucide-react';
+import { TOP_COMPANIES, POPULAR_ROLES, EXPERIENCE_LEVELS } from '../data/companyRolePresets.js';
 
 function Toggle({ value, onChange }) {
   return (
@@ -20,9 +21,34 @@ function Toggle({ value, onChange }) {
 }
 
 export default function Settings({ darkMode = true, onToggleDarkMode }) {
+  const [activeTab, setActiveTab] = useState('preferences'); // 'profile' | 'preferences' | 'account'
   const [notifications, setNotifications] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
+  const [aiSuggestions, setAiSuggestions] = useState(true);
+
+  // Default target interview preferences
+  const [defaultCompany, setDefaultCompany] = useState(() => {
+    return localStorage.getItem('interview-ai-pref-company') || 'Google';
+  });
+  const [defaultRole, setDefaultRole] = useState(() => {
+    return localStorage.getItem('interview-ai-pref-role') || 'Full Stack Developer';
+  });
+  const [defaultSeniority, setDefaultSeniority] = useState(() => {
+    return localStorage.getItem('interview-ai-pref-seniority') || 'Mid-Level (3-5 yrs)';
+  });
+
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
+
+  const handleSaveChanges = () => {
+    try {
+      localStorage.setItem('interview-ai-pref-company', defaultCompany);
+      localStorage.setItem('interview-ai-pref-role', defaultRole);
+      localStorage.setItem('interview-ai-pref-seniority', defaultSeniority);
+    } catch (_) {}
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
 
   const handleClearData = () => {
     if (!clearConfirm) {
@@ -39,128 +65,262 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto p-8 space-y-6">
+      <div className="max-w-3xl mx-auto p-6 sm:p-8 space-y-6">
 
-        <div>
-          <h1 className="text-2xl font-bold text-white">Settings</h1>
-          <p className="text-slate-400 text-sm mt-1">Manage your Interview AI preferences and data</p>
+        {/* Page Title & Navigation Tabs */}
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <p className="text-slate-400 text-sm mt-1">Manage your Interview AI profile, defaults, and app preferences</p>
+          </div>
+
+          <div className="flex space-x-2 border-b border-slate-800 pb-2">
+            {[
+              { id: 'profile', label: 'Profile' },
+              { id: 'preferences', label: 'Preferences' },
+              { id: 'account', label: 'Account & Data' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+                  activeTab === tab.id
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                    : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Appearance */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Appearance</h3>
+        {/* PROFILE TAB */}
+        {activeTab === 'profile' && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-indigo-500/20">
+                TR
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white">Triveni Reddy</h3>
+                <p className="text-xs text-slate-400">Software Engineering Candidate</p>
+                <p className="text-xs text-indigo-400 mt-1">triveni030208@gmail.com</p>
+              </div>
+            </div>
 
-          <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                <Moon className="w-4 h-4 text-indigo-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  defaultValue="Triveni Reddy"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Dark Mode</p>
-                <p className="text-xs text-slate-400">Use dark theme throughout the app</p>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  defaultValue="triveni030208@gmail.com"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-indigo-500"
+                />
               </div>
-            </div>
-            <Toggle value={darkMode} onChange={onToggleDarkMode || (() => {})} />
-          </div>
-
-          <div className="flex items-center justify-between py-3.5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <Bell className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">Notifications</p>
-                <p className="text-xs text-slate-400">Session reminders and progress updates</p>
-              </div>
-            </div>
-            <Toggle value={notifications} onChange={setNotifications} />
-          </div>
-        </div>
-
-        {/* API Configuration */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Configuration</h3>
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg mt-0.5">
-              <Key className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">Gemini API Key</p>
-              <p className="text-xs text-slate-400 mt-0.5 mb-3">
-                Set <code className="text-indigo-300 bg-slate-800 px-1 rounded">GEMINI_API_KEY</code> in your
-                backend <code className="text-indigo-300 bg-slate-800 px-1 rounded">.env</code> file to
-                enable AI-powered study plans, question generation, and evaluation.
-              </p>
-              <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 font-mono text-xs text-slate-300">
-                # /interview-ai/.env<br />
-                GEMINI_API_KEY=your_key_here<br />
-                PORT=5001
-              </div>
-              <p className="text-[11px] text-emerald-400 mt-2">
-                ✓ Fallback mode is active — all features work without an API key.
-              </p>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Data & Privacy */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Data & Privacy</h3>
-
-          <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <Shield className="w-4 h-4 text-emerald-400" />
+        {/* PREFERENCES TAB */}
+        {activeTab === 'preferences' && (
+          <div className="space-y-6">
+            {/* Target Interview Defaults */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    Target Interview Defaults
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Pre-populate your benchmark target role on the resume analysis page
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-white">Auto-Save Sessions</p>
-                <p className="text-xs text-slate-400">Save analysis results to local storage</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                    Default Company
+                  </label>
+                  <select
+                    value={defaultCompany}
+                    onChange={(e) => setDefaultCompany(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {TOP_COMPANIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                    Default Role
+                  </label>
+                  <select
+                    value={defaultRole}
+                    onChange={(e) => setDefaultRole(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {POPULAR_ROLES.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
+                    Default Seniority
+                  </label>
+                  <select
+                    value={defaultSeniority}
+                    onChange={(e) => setDefaultSeniority(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {EXPERIENCE_LEVELS.map((lvl) => (
+                      <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <Toggle value={autoSave} onChange={setAutoSave} />
-          </div>
 
-          <div className="py-3.5">
-            <button
-              type="button"
-              onClick={handleClearData}
-              className={`flex items-center gap-3 text-left w-full transition ${
-                clearConfirm ? 'text-red-400' : 'text-slate-400 hover:text-red-400'
-              }`}
-            >
-              <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <Trash2 className="w-4 h-4 text-red-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">
-                  {clearConfirm ? '⚠ Click again to confirm — this cannot be undone' : 'Clear All Saved Data'}
-                </p>
-                <p className="text-xs text-slate-500">Delete all sessions, progress, and cached results</p>
-              </div>
-            </button>
-          </div>
-        </div>
+            {/* Appearance & Notifications */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Appearance & Interaction</h3>
 
-        {/* About */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">About</h3>
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-slate-800 rounded-lg mt-0.5">
-              <Info className="w-4 h-4 text-slate-400" />
+              <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                    <Moon className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Dark Mode</p>
+                    <p className="text-xs text-slate-400">Toggle dark or light theme throughout the application</p>
+                  </div>
+                </div>
+                <Toggle value={darkMode} onChange={onToggleDarkMode || (() => {})} />
+              </div>
+
+              <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <Bell className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Notifications</p>
+                    <p className="text-xs text-slate-400">Session reminders and study progress updates</p>
+                  </div>
+                </div>
+                <Toggle value={notifications} onChange={setNotifications} />
+              </div>
+
+              <div className="flex items-center justify-between py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Enable AI Suggestions</p>
+                    <p className="text-xs text-slate-400">Automate curriculum gap recommendations and follow-up drills</p>
+                  </div>
+                </div>
+                <Toggle value={aiSuggestions} onChange={setAiSuggestions} />
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-white">Interview AI v1.0</p>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                AI-powered interview preparation platform built with React, Node.js, and Google Gemini.
-                Features Layer 1 Privacy Protection (bias redaction) and Layer 2 Resume Consistency
-                Governance (hallucination checking).
-              </p>
+
+            {/* Save Changes Button */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              {savedSuccess && (
+                <span className="text-xs text-emerald-400 flex items-center gap-1 font-semibold">
+                  <Check className="w-3.5 h-3.5" />
+                  Preferences Saved!
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveChanges}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ACCOUNT & DATA TAB */}
+        {activeTab === 'account' && (
+          <div className="space-y-6">
+            {/* Data & Privacy */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Data & Privacy</h3>
+
+              <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Auto-Save Sessions</p>
+                    <p className="text-xs text-slate-400">Automatically save resume delta analyses and mock interviews to your browser</p>
+                  </div>
+                </div>
+                <Toggle value={autoSave} onChange={setAutoSave} />
+              </div>
+
+              <div className="py-3.5">
+                <button
+                  type="button"
+                  onClick={handleClearData}
+                  className={`flex items-center gap-3 text-left w-full transition ${
+                    clearConfirm ? 'text-red-400' : 'text-slate-400 hover:text-red-400'
+                  }`}
+                >
+                  <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {clearConfirm ? '⚠ Click again to confirm — this cannot be undone' : 'Clear All Saved Data'}
+                    </p>
+                    <p className="text-xs text-slate-500">Delete all stored sessions, study roadmaps, and cached interview history</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* About */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">About</h3>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-slate-800 rounded-lg mt-0.5">
+                  <Info className="w-4 h-4 text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Interview AI Platform</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    AI-driven interview preparation platform with Layer 1 Privacy Protection (demographic bias redaction) and Layer 2 Consistency Governance (hallucination checking).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
   );
 }
-
