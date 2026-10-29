@@ -19,3 +19,4 @@ app.get('/api/health', (req, res) => {
 app.use('/api/resume', resumeRoutes);
 
 export default app;
+

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, Bell, Trash2, Shield, Info, Sparkles, User, Building2, Briefcase, GraduationCap, Check } from 'lucide-react';
-import { TOP_COMPANIES, POPULAR_ROLES, EXPERIENCE_LEVELS } from '../data/companyRolePresets.js';
+import { Moon, Bell, Trash2, Shield, Info, Sparkles, Check } from 'lucide-react';
 
 function Toggle({ value, onChange }) {
   return (
@@ -22,19 +21,23 @@ function Toggle({ value, onChange }) {
 
 export default function Settings({ darkMode = true, onToggleDarkMode }) {
   const [activeTab, setActiveTab] = useState('preferences'); // 'profile' | 'preferences' | 'account'
-  const [notifications, setNotifications] = useState(false);
-  const [autoSave, setAutoSave] = useState(true);
-  const [aiSuggestions, setAiSuggestions] = useState(true);
-
-  // Default target interview preferences
-  const [defaultCompany, setDefaultCompany] = useState(() => {
-    return localStorage.getItem('interview-ai-pref-company') || 'Google';
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('interview-ai-notifications');
+      return saved ? JSON.parse(saved) : false;
+    } catch (_) { return false; }
   });
-  const [defaultRole, setDefaultRole] = useState(() => {
-    return localStorage.getItem('interview-ai-pref-role') || 'Full Stack Developer';
+  const [autoSave, setAutoSave] = useState(() => {
+    try {
+      const saved = localStorage.getItem('interview-ai-autosave');
+      return saved ? JSON.parse(saved) : true;
+    } catch (_) { return true; }
   });
-  const [defaultSeniority, setDefaultSeniority] = useState(() => {
-    return localStorage.getItem('interview-ai-pref-seniority') || 'Mid-Level (3-5 yrs)';
+  const [aiSuggestions, setAiSuggestions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('interview-ai-suggestions');
+      return saved ? JSON.parse(saved) : true;
+    } catch (_) { return true; }
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -42,9 +45,9 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
 
   const handleSaveChanges = () => {
     try {
-      localStorage.setItem('interview-ai-pref-company', defaultCompany);
-      localStorage.setItem('interview-ai-pref-role', defaultRole);
-      localStorage.setItem('interview-ai-pref-seniority', defaultSeniority);
+      localStorage.setItem('interview-ai-notifications', JSON.stringify(notifications));
+      localStorage.setItem('interview-ai-autosave', JSON.stringify(autoSave));
+      localStorage.setItem('interview-ai-suggestions', JSON.stringify(aiSuggestions));
     } catch (_) {}
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
@@ -133,72 +136,7 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
         {/* PREFERENCES TAB */}
         {activeTab === 'preferences' && (
           <div className="space-y-6">
-            {/* Target Interview Defaults */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-indigo-400" />
-                    Target Interview Defaults
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Pre-populate your benchmark target role on the resume analysis page
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                    Default Company
-                  </label>
-                  <select
-                    value={defaultCompany}
-                    onChange={(e) => setDefaultCompany(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {TOP_COMPANIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-                    Default Role
-                  </label>
-                  <select
-                    value={defaultRole}
-                    onChange={(e) => setDefaultRole(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {POPULAR_ROLES.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
-                    Default Seniority
-                  </label>
-                  <select
-                    value={defaultSeniority}
-                    onChange={(e) => setDefaultSeniority(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {EXPERIENCE_LEVELS.map((lvl) => (
-                      <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Appearance & Notifications */}
+            {/* Appearance & Interaction */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Appearance & Interaction</h3>
 
@@ -228,7 +166,7 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
                 <Toggle value={notifications} onChange={setNotifications} />
               </div>
 
-              <div className="flex items-center justify-between py-3.5">
+              <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                     <Sparkles className="w-4 h-4 text-emerald-400" />
@@ -239,6 +177,19 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
                   </div>
                 </div>
                 <Toggle value={aiSuggestions} onChange={setAiSuggestions} />
+              </div>
+
+              <div className="flex items-center justify-between py-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                    <Shield className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">Auto-Save Sessions</p>
+                    <p className="text-xs text-slate-400">Automatically save resume delta analyses and interview history</p>
+                  </div>
+                </div>
+                <Toggle value={autoSave} onChange={setAutoSave} />
               </div>
             </div>
 
@@ -267,19 +218,6 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
             {/* Data & Privacy */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-1">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Data & Privacy</h3>
-
-              <div className="flex items-center justify-between py-3.5 border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                    <Shield className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">Auto-Save Sessions</p>
-                    <p className="text-xs text-slate-400">Automatically save resume delta analyses and mock interviews to your browser</p>
-                  </div>
-                </div>
-                <Toggle value={autoSave} onChange={setAutoSave} />
-              </div>
 
               <div className="py-3.5">
                 <button

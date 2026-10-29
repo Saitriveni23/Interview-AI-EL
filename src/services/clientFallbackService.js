@@ -115,3 +115,4 @@ export async function analyzeResumeClientSide({
     isClientProcessed: true
   };
 }
+
