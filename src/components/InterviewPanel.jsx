@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock, Mic, MicOff, Volume2, VolumeX, Sparkles, Printer } from 'lucide-react';
 
 // ==========================================
 // 1. LOCAL TECHNICAL QUESTION BANK
@@ -536,6 +536,19 @@ function ModeSelectionScreen({ targetInfo, onSelectMode }) {
   );
 }
 
+// ==========================================
+// STAR Method Real-time Assessment Helper
+// ==========================================
+function analyzeSTAR(text) {
+  if (!text || text.length < 15) return null;
+  const lower = text.toLowerCase();
+  const s = /(at|in|when|during|project|team|client|company|system|faced|situation)/i.test(lower);
+  const t = /(task|goal|needed to|had to|objective|challenge|assigned|responsible|requirements)/i.test(lower);
+  const a = /(i implemented|i built|i designed|i created|i resolved|i optimized|i led|i developed|i refactored|i wrote|we built)/i.test(lower);
+  const r = /(result|increased|decreased|improved|reduced|percent|%|saved|boosted|achieved|delivered|metrics|latency)/i.test(lower);
+  return { s, t, a, r, count: [s, t, a, r].filter(Boolean).length };
+}
+
 export default function InterviewPanel({
   targetInfo,
   candidateSkills = [],
@@ -557,6 +570,102 @@ export default function InterviewPanel({
   const [evaluation, setEvaluation] = useState(null);
   const [evaluating, setEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState("");
+
+  // Voice AI States
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // Stop speech when component unmounts or question changes
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+    };
+  }, []);
+
+  // Text-to-Speech: AI Interviewer speaks the question
+  const toggleSpeakQuestion = (text) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Speech synthesis is not supported in your browser.');
+      return;
+    }
+
+    if (isSpeakingQuestion) {
+      window.speechSynthesis.cancel();
+      setIsSpeakingQuestion(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.onend = () => setIsSpeakingQuestion(false);
+    utterance.onerror = () => setIsSpeakingQuestion(false);
+    setIsSpeakingQuestion(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Speech-to-Text: Microphone voice answering
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        let currentTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        if (currentTranscript.trim()) {
+          setAnswer((prev) => {
+            const separator = prev && !prev.endsWith(' ') ? ' ' : '';
+            return prev + separator + currentTranscript.trim();
+          });
+        }
+      };
+
+      recognition.onerror = (err) => {
+        console.warn('Speech recognition error:', err);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      console.warn('Speech recognition start failed:', e);
+      setIsListening(false);
+    }
+  };
 
   const skillsKey = JSON.stringify(
     Array.isArray(candidateSkills) ? candidateSkills : []
@@ -952,23 +1061,106 @@ export default function InterviewPanel({
           </p>
 
           {/* QUESTION */}
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <h3 className="text-xl font-semibold leading-relaxed">
+              {questions[currentQuestion].question}
+            </h3>
+            <button
+              type="button"
+              onClick={() => toggleSpeakQuestion(questions[currentQuestion].question)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition ${
+                isSpeakingQuestion
+                  ? 'bg-amber-600/30 text-amber-300 border border-amber-500/40 animate-pulse'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+              }`}
+              title="Listen to AI interviewer speak this question"
+            >
+              {isSpeakingQuestion ? (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Stop Speaking</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>🔊 Read Aloud</span>
+                </>
+              )}
+            </button>
+          </div>
 
-          <h3 className="text-xl font-semibold mb-6">
-            {questions[currentQuestion].question}
-          </h3>
+          {/* ANSWER INPUT & VOICE RECORDING CONTROLS */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-400">
+                Your Answer
+              </label>
 
-          {/* ANSWER INPUT */}
+              {/* Voice Answer Button */}
+              <button
+                type="button"
+                onClick={toggleListening}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                    : 'bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300'
+                }`}
+              >
+                {isListening ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Listening... Speak now</span>
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>🎙️ Answer with Voice (Microphone)</span>
+                  </>
+                )}
+              </button>
+            </div>
 
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer here..."
-            rows={6}
-            className="w-full p-4 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-indigo-500"
-          />
+            <textarea
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder={isListening ? "Listening to your voice... Speak clearly into your microphone." : "Type your answer here or click 'Answer with Voice'..."}
+              rows={6}
+              className={`w-full p-4 rounded-xl bg-slate-950 border ${
+                isListening ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-slate-700'
+              } text-white focus:outline-none focus:border-indigo-500 transition`}
+            />
+
+            {/* STAR Framework Real-time Assessment Coach */}
+            {(() => {
+              const star = analyzeSTAR(answer);
+              if (!star) return null;
+              return (
+                <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-semibold text-slate-200">STAR Method Real-Time Alignment:</span>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono text-[11px]">
+                    <span className={`px-2 py-0.5 rounded ${star.s ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}>
+                      S: Situation {star.s ? '✓' : '—'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${star.t ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}>
+                      T: Task {star.t ? '✓' : '—'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${star.a ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}>
+                      A: Action {star.a ? '✓' : '—'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded ${star.r ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                      R: Result {star.r ? '✓' : '(add % / metrics)'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
 
           {/* NEXT BUTTON */}
-
           <button
             onClick={handleNext}
             className="mt-5 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-semibold"
@@ -1215,6 +1407,16 @@ export default function InterviewPanel({
                   <div className="flex items-center gap-2 self-end sm:self-center">
                     <button
                       onClick={() => {
+                        window.print();
+                      }}
+                      className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition"
+                      title="Print or Save as PDF"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print / PDF</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         const reportText = `INTERVIEW PERFORMANCE REPORT
 Role: ${targetInfo?.role || 'Software Engineer'}
 Company: ${targetInfo?.company || 'Target Company'}
@@ -1256,10 +1458,10 @@ Improvement: ${q.improvement}
                         a.click();
                         URL.revokeObjectURL(url);
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/20 transition"
+                      className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download Report</span>
+                      <span>Download .txt</span>
                     </button>
                     <button
                       onClick={() => {
