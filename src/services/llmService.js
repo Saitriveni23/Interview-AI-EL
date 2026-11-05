@@ -76,7 +76,8 @@ export class LLMService {
     deltaAnalysis,
     preferredStudyWeeks = 4,
     weeklyStudyHours = 10,
-    targetInfo = null
+    targetInfo = null,
+    planMode = 'gemini' // 'gemini' (dynamic AI) | 'fixed' (structured curriculum)
   ) {
 
     const existingSkills = candidateProfile.skills || [];
@@ -537,13 +538,17 @@ const fallbackPlan = () => {
     ? `Targeting ${targetRole} at ${targetCompany} (${experienceLevel || 'Engineering'}). This ${finalStudyWeeks}-week preparation plan bridges identified skill gaps: ${missingSkills.join(', ')}.`
     : `This ${finalStudyWeeks}-week preparation plan covers the identified skill gaps: ${missingSkills.join(', ')}.`;
     // ------------------------------------
-    // STEP 7: CHECK GEMINI API KEY
+    // STEP 7: CHECK STUDY PLAN MODE OR GEMINI API KEY
+    // If user explicitly chooses "fixed" structured mode or Gemini is not available,
+    // return the instant, verified battle-tested curriculum!
     // ------------------------------------
 
-    if (!this.apiKey) {
-      console.warn(
-        'GEMINI_API_KEY missing. Using fallback study plan.'
-      );
+    if (planMode === 'fixed' || !this.apiKey) {
+      if (planMode === 'fixed') {
+        console.info('User selected Structured Fixed Curriculum mode.');
+      } else {
+        console.warn('GEMINI_API_KEY missing. Using fallback structured study plan.');
+      }
 
       return fallbackPlan();
     }

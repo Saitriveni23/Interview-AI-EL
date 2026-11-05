@@ -10,7 +10,12 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
-  CheckCircle2
+  CheckCircle2,
+  Table,
+  Cpu,
+  Wifi,
+  WifiOff,
+  Globe
 } from 'lucide-react';
 import {
   TOP_COMPANIES,
@@ -58,6 +63,29 @@ export default function ResumeUploader({ onParse, isLoading }) {
   const [experienceLevel, setExperienceLevel] = useState('Mid-Level (3-5 yrs)');
   const [showCustomJD, setShowCustomJD] = useState(false);
 
+  // LinkedIn Recruitment Import States
+  const [linkedInModalOpen, setLinkedInModalOpen] = useState(false);
+  const [linkedInRawText, setLinkedInRawText] = useState('');
+  const [linkedInUrl, setLinkedInUrl] = useState('');
+  const [parsedJobTable, setParsedJobTable] = useState(null);
+
+  // Study Plan Engine Preference: 'gemini' (Dynamic AI) vs 'fixed' (Curated Syllabus)
+  const [studyPlanMode, setStudyPlanMode] = useState('gemini');
+
+  // Network Offline Detection Status
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const effectiveCompany =
     companySelect === 'Custom Company'
       ? customCompany.trim() || 'Target Company'
@@ -98,6 +126,63 @@ export default function ResumeUploader({ onParse, isLoading }) {
     );
   };
 
+  const handleApplyLinkedInJob = (job) => {
+    setParsedJobTable(job);
+    setCompanySelect('Custom Company');
+    setCustomCompany(job.company);
+    setRoleSelect('Custom Role');
+    setCustomRole(job.title);
+    setExperienceLevel(job.experienceLevel || 'Mid-Level');
+    setJobDescription(
+      `${job.title} at ${job.company}\nLocation: ${job.location}\nRequired Skills: ${job.requiredSkills.join(', ')}\n\nResponsibilities:\n${job.responsibilities.map(r => `• ${r}`).join('\n')}\n\nFull Recruitment Description:\n${job.rawJobDescription}`
+    );
+    setLinkedInModalOpen(false);
+  };
+
+  const handleFetchLinkedInData = async () => {
+    if (!linkedInRawText.trim()) {
+      alert('Please paste the LinkedIn job recruitment text.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/resume/parse-linkedin-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawJobText: linkedInRawText,
+          sourceUrl: linkedInUrl
+        })
+      });
+
+      const data = await response.json();
+      if (data.success && data.job) {
+        handleApplyLinkedInJob(data.job);
+      } else {
+        throw new Error(data.error || 'Unable to parse LinkedIn job post');
+      }
+    } catch (err) {
+      // In-browser client fallback parser if backend is offline!
+      const lines = linkedInRawText.trim().split('\n').filter(Boolean);
+      const title = lines[0] || 'Software Engineer';
+      const company = lines[1] || 'Target Company';
+      const fallbackJob = {
+        title,
+        company,
+        location: 'Remote / Hybrid',
+        experienceLevel: 'Mid-Level',
+        requiredSkills: ['React', 'Node.js', 'REST API', 'JavaScript', 'SQL'],
+        responsibilities: [
+          `Build high-scale web products for ${company}.`,
+          'Collaborate on REST API services and responsive user interfaces.',
+          'Optimize query and frontend performance metrics.'
+        ],
+        rawJobDescription: linkedInRawText
+      };
+      handleApplyLinkedInJob(fallbackJob);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (activeTab === 'upload' && !file) {
@@ -120,6 +205,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
     formData.append('targetRole', effectiveRole);
     formData.append('experienceLevel', experienceLevel);
     formData.append('jobDescription', jobDescription);
+    formData.append('studyPlanMode', studyPlanMode);
 
     onParse(formData);
   };
@@ -135,14 +221,24 @@ export default function ResumeUploader({ onParse, isLoading }) {
               Set your target role and upload your resume to begin your AI-powered analysis and personalized study plan.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleLoadSample}
-            className="flex items-center space-x-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition whitespace-nowrap self-start sm:self-auto"
-          >
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span>Load Sample (Google SDE)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLinkedInModalOpen(true)}
+              className="flex items-center space-x-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 transition whitespace-nowrap"
+            >
+              <Globe className="w-4 h-4 text-blue-400" />
+              <span>Import from LinkedIn</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLoadSample}
+              className="flex items-center space-x-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 transition whitespace-nowrap self-start sm:self-auto"
+            >
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Load Sample (Google SDE)</span>
+            </button>
+          </div>
         </div>
 
         {/* 3-Step Indicator */}
@@ -177,6 +273,56 @@ export default function ResumeUploader({ onParse, isLoading }) {
               ✨ Pre-tuned benchmark requirements
             </span>
           </div>
+
+          {/* Display LinkedIn Table if Imported */}
+          {parsedJobTable && (
+            <div className="bg-blue-950/30 border border-blue-500/40 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Table className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold text-blue-300">Imported LinkedIn Recruitment Table</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setParsedJobTable(null)}
+                  className="text-[10px] text-slate-400 hover:text-white underline"
+                >
+                  Clear Table
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border border-slate-800 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-950 text-slate-400">
+                    <tr>
+                      <th className="p-2 border-b border-slate-800">Job Role</th>
+                      <th className="p-2 border-b border-slate-800">Company</th>
+                      <th className="p-2 border-b border-slate-800">Location</th>
+                      <th className="p-2 border-b border-slate-800">Experience</th>
+                      <th className="p-2 border-b border-slate-800">Required Skills</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-slate-900/60 divide-y divide-slate-800">
+                    <tr>
+                      <td className="p-2 font-semibold text-white">{parsedJobTable.title}</td>
+                      <td className="p-2 text-indigo-300">{parsedJobTable.company}</td>
+                      <td className="p-2 text-slate-300">{parsedJobTable.location}</td>
+                      <td className="p-2 text-slate-300">{parsedJobTable.experienceLevel}</td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1">
+                          {parsedJobTable.requiredSkills.map(s => (
+                            <span key={s} className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-mono">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Company Selection */}
@@ -305,6 +451,54 @@ export default function ResumeUploader({ onParse, isLoading }) {
               </div>
             )}
           </div>
+          {/* Study Plan Engine Selection & Offline Status */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-800/80 mt-4">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                Study Plan Mode:
+              </span>
+              <div className="inline-flex rounded-lg p-0.5 bg-slate-950 border border-slate-800 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setStudyPlanMode('gemini')}
+                  className={`px-3 py-1 rounded-md font-semibold transition ${
+                    studyPlanMode === 'gemini'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  AI Dynamic (Gemini)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudyPlanMode('fixed')}
+                  className={`px-3 py-1 rounded-md font-semibold transition ${
+                    studyPlanMode === 'fixed'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Fixed Structured (Offline Ready)
+                </button>
+              </div>
+            </div>
+
+            {/* Offline Detection Indicator */}
+            <div className="flex items-center gap-1.5 text-[11px] font-medium">
+              {isOnline ? (
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <Wifi className="w-3 h-3" />
+                  <span>Cloud Active</span>
+                </span>
+              ) : (
+                <span className="text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                  <WifiOff className="w-3 h-3" />
+                  <span>Offline Mode (Local Engine Active)</span>
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ================= STEP 2: RESUME INPUT ================= */}
@@ -416,6 +610,102 @@ export default function ResumeUploader({ onParse, isLoading }) {
           </button>
         </div>
       </form>
+
+      {/* ================= LINKEDIN IMPORT MODAL ================= */}
+      {linkedInModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Import Job Recruitment from LinkedIn</h3>
+                  <p className="text-xs text-slate-400">Parse LinkedIn job details, extract required skills, and populate the match table</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkedInModalOpen(false)}
+                className="text-slate-400 hover:text-white text-lg font-bold px-2 py-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  LinkedIn Job URL (Optional):
+                </label>
+                <input
+                  type="url"
+                  value={linkedInUrl}
+                  onChange={(e) => setLinkedInUrl(e.target.value)}
+                  placeholder="https://www.linkedin.com/jobs/view/..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Paste LinkedIn Job Recruitment Post / Text:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLinkedInRawText(
+`Full Stack Engineer at Spotify
+Location: New York, NY (Hybrid)
+Experience: 3+ years of experience
+
+About the role:
+We are looking for a Full Stack Engineer to scale our creator ecosystem.
+Key Requirements:
+• 3+ years experience with React, TypeScript, and modern CSS
+• Hands-on proficiency with Node.js, Express.js, and REST APIs
+• Relational database experience with PostgreSQL or MongoDB
+• Containerization experience with Docker and AWS cloud services
+• Familiarity with Git, CI/CD, and agile engineering practices`
+                      );
+                    }}
+                    className="text-[11px] text-blue-400 hover:underline"
+                  >
+                    Paste Example Post
+                  </button>
+                </div>
+                <textarea
+                  rows={8}
+                  value={linkedInRawText}
+                  onChange={(e) => setLinkedInRawText(e.target.value)}
+                  placeholder="Paste the complete job post, title, company, requirements, and responsibilities from LinkedIn..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono placeholder-slate-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setLinkedInModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleFetchLinkedInData}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition flex items-center gap-1.5"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Parse & Populate Job Table</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

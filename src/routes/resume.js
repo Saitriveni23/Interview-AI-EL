@@ -7,6 +7,8 @@ import { LLMService } from '../services/llmService.js';
 import { generateGeminiQuestions } from '../services/geminiService.js';
 import { evaluateInterview } from '../services/interviewEvaluationService.js';
 import { getPresetJobDescription } from '../data/companyRolePresets.js';
+import { parseLinkedInJob } from '../services/linkedInService.js';
+import { CandidateSession, LinkedInJob, InterviewEvaluation, isDBConnected } from '../db/mongo.js';
 
 const router = Router();
 
@@ -70,16 +72,42 @@ router.post(
       };
 
       // Generate personalized study plan targeting the company and role
+      const planMode = req.body.studyPlanMode || 'gemini'; // 'gemini' | 'fixed'
       const studyPlan = await llmService.generateStudyPlan(
         candidateProfile,
         deltaAnalysis,
         4,
         10,
-        targetInfo
+        targetInfo,
+        planMode
       );
+
+      // Asynchronously persist to MongoDB if connected
+      const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      if (isDBConnected()) {
+        try {
+          await CandidateSession.create({
+            sessionId,
+            targetCompany,
+            targetRole,
+            experienceLevel,
+            extractedSkills: candidateProfile.skills || [],
+            matchingSkills: deltaAnalysis.matchingSkills || [],
+            missingSkills: deltaAnalysis.missingSkills || [],
+            matchPercentage: deltaAnalysis.matchPercentage,
+            totalRedactions: redactionResult.stats?.totalRedactions || 0,
+            redactionTypes: (redactionResult.auditLog || []).map(a => a.type),
+            studyPlan
+          });
+        } catch (dbErr) {
+          console.warn('MongoDB session save warning (non-blocking):', dbErr.message);
+        }
+      }
 
       return res.json({
         success: true,
+        sessionId,
+        dbStatus: isDBConnected() ? 'MongoDB Active' : 'Offline / Resilient Edge Mode',
         targetInfo,
         originalText: rawText,
         redactedText: redactionResult.redactedText,
@@ -108,7 +136,59 @@ router.post(
 );
 
 // ==========================================
-// 2. GENERATE PERSONALIZED STUDY PLAN
+// 2. LINKEDIN JOB RECRUITMENT IMPORT & TABLE MATCHING
+// ==========================================
+
+router.post('/parse-linkedin-job', async (req, res) => {
+  try {
+    const { rawJobText, sourceUrl } = req.body;
+
+    if (!rawJobText || !rawJobText.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please paste a LinkedIn job recruitment post or text.'
+      });
+    }
+
+    const jobData = parseLinkedInJob(rawJobText, sourceUrl);
+
+    // Save to MongoDB if available
+    if (isDBConnected()) {
+      try {
+        await LinkedInJob.create({
+          jobId: jobData.jobId,
+          title: jobData.title,
+          company: jobData.company,
+          location: jobData.location,
+          employmentType: jobData.employmentType,
+          experienceLevel: jobData.experienceLevel,
+          sourceUrl: jobData.sourceUrl,
+          rawJobDescription: jobData.rawJobDescription,
+          requiredSkills: jobData.requiredSkills,
+          responsibilities: jobData.responsibilities
+        });
+      } catch (dbErr) {
+        console.warn('MongoDB job save warning (non-blocking):', dbErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      job: jobData,
+      dbStatus: isDBConnected() ? 'MongoDB Stored' : 'In-Memory / Edge Mode'
+    });
+
+  } catch (error) {
+    console.error('LinkedIn job parsing error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to parse LinkedIn job post: ' + error.message
+    });
+  }
+});
+
+// ==========================================
+// 3. GENERATE PERSONALIZED STUDY PLAN
 // ==========================================
 
 router.post('/generate-study-plan', async (req, res) => {
@@ -158,12 +238,14 @@ router.post('/generate-study-plan', async (req, res) => {
       });
     }
 
+    const planMode = req.body.studyPlanMode || 'gemini'; // 'gemini' | 'fixed'
     const studyPlan = await llmService.generateStudyPlan(
       candidateProfile,
       deltaAnalysis,
       selectedWeeks,
       hoursPerWeek,
-      targetInfo
+      targetInfo,
+      planMode
     );
 
     return res.json({
@@ -305,9 +387,28 @@ router.post('/evaluate-interview', async (req, res) => {
       llmService
     });
 
+    // Save evaluation to MongoDB if connected
+    if (isDBConnected() && evaluation?.overallScore != null) {
+      try {
+        await InterviewEvaluation.create({
+          sessionId: req.body.sessionId || `eval_${Date.now()}`,
+          overallScore: evaluation.overallScore,
+          categoryScores: evaluation.categoryScores || {},
+          questionEvaluations: evaluation.questionEvaluations || [],
+          strengths: evaluation.strengths || [],
+          improvementAreas: evaluation.improvementAreas || [],
+          recommendations: evaluation.recommendations || [],
+          source: evaluation.source || 'ai'
+        });
+      } catch (dbErr) {
+        console.warn('MongoDB evaluation save warning (non-blocking):', dbErr.message);
+      }
+    }
+
     return res.json({
       success: true,
-      evaluation
+      evaluation,
+      dbStatus: isDBConnected() ? 'MongoDB Saved' : 'In-Memory / Client Saved'
     });
 
   } catch (error) {

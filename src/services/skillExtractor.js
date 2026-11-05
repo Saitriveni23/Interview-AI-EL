@@ -11,7 +11,7 @@
  */
 
 // Canonical skill names and their alternative spellings
-const SKILL_DEFINITIONS = {
+export const SKILL_DEFINITIONS = {
   // Frontend Development
   "HTML": ["HTML", "HTML5"],
   "CSS": ["CSS", "CSS3"],
@@ -28,24 +28,24 @@ const SKILL_DEFINITIONS = {
   "Webpack": ["Webpack"],
 
   // Backend Development
-  "Node.js": ["Node.js", "NodeJS"],
-  "Express.js": ["Express", "Express.js", "ExpressJS"],
-  "Python": ["Python", "Python3"],
-  "Java": ["Java"],
+  "Node.js": ["Node.js", "NodeJS", "Node js", "Node"],
+  "Express.js": ["Express", "Express.js", "ExpressJS", "Express js"],
+  "Python": ["Python", "Python3", "Py"],
+  "Java": ["Java", "Core Java"],
   "C": ["C Programming", "C Language", "Programming in C"],
   "C++": ["C++", "CPP"],
   "C#": ["C#", "C Sharp"],
   "Go": ["Golang", "Go Language"],
   "Rust": ["Rust"],
   "PHP": ["PHP"],
-  "Ruby": ["Ruby"],
-  "Django": ["Django"],
+  "Ruby": ["Ruby", "Ruby on Rails", "Rails"],
+  "Django": ["Django", "Django REST"],
   "Flask": ["Flask"],
   "FastAPI": ["FastAPI"],
-  "Spring Boot": ["Spring Boot", "SpringBoot"],
-  ".NET": [".NET", "Dot Net", "ASP.NET"],
-  "REST API": ["REST API", "RESTful API", "REST APIs"],
-  "GraphQL": ["GraphQL"],
+  "Spring Boot": ["Spring Boot", "SpringBoot", "Spring"],
+  ".NET": [".NET", "Dot Net", "ASP.NET", "dotnet"],
+  "REST API": ["REST API", "RESTful API", "REST APIs", "REST", "RESTful", "RESTful Web Services", "REST Services"],
+  "GraphQL": ["GraphQL", "Graph QL"],
 
   // Databases
   "SQL": ["SQL"],
@@ -190,6 +190,27 @@ export class SkillExtractor {
     return detectedSkills;
   }
 
+  /**
+   * Resolves any skill alias (e.g. "REST", "RESTful", "REST APIs")
+   * to its canonical root skill name (e.g. "REST API").
+   */
+  getCanonicalSkill(skillQuery) {
+    if (!skillQuery || typeof skillQuery !== "string") return null;
+    const cleanQuery = skillQuery.trim().toLowerCase();
+
+    for (const [canonicalSkill, aliases] of Object.entries(SKILL_DEFINITIONS)) {
+      if (canonicalSkill.toLowerCase() === cleanQuery) {
+        return canonicalSkill;
+      }
+      for (const alias of aliases) {
+        if (alias.toLowerCase() === cleanQuery) {
+          return canonicalSkill;
+        }
+      }
+    }
+    return null;
+  }
+
 
   /**
    * Extract explicitly stated years of experience.
@@ -277,20 +298,33 @@ export class SkillExtractor {
       };
     }
 
-    // Convert candidate skills to lowercase for comparison
-    const candidateSkillsLower = new Set(
-      safeCandidateSkills.map(skill => skill.toLowerCase())
-    );
+    // Normalize candidate skills to their canonical forms
+    // This solves "REST & REST API" matching: if candidate has "REST" or "REST API",
+    // it normalizes to canonical "REST API", matching accurately without strict hardcoding!
+    const canonicalCandidateSkills = new Set();
+    for (const rawSkill of safeCandidateSkills) {
+      const canonical = this.getCanonicalSkill(rawSkill) || rawSkill;
+      canonicalCandidateSkills.add(canonical.toLowerCase());
+      canonicalCandidateSkills.add(rawSkill.toLowerCase());
+    }
 
     // Identify matching skills
-    const matchingSkills = requiredSkills.filter(skill =>
-      candidateSkillsLower.has(skill.toLowerCase())
-    );
+    const matchingSkills = requiredSkills.filter(skill => {
+      const canonicalReq = (this.getCanonicalSkill(skill) || skill).toLowerCase();
+      return (
+        canonicalCandidateSkills.has(skill.toLowerCase()) ||
+        canonicalCandidateSkills.has(canonicalReq)
+      );
+    });
 
     // Identify missing skills
-    const missingSkills = requiredSkills.filter(skill =>
-      !candidateSkillsLower.has(skill.toLowerCase())
-    );
+    const missingSkills = requiredSkills.filter(skill => {
+      const canonicalReq = (this.getCanonicalSkill(skill) || skill).toLowerCase();
+      return !(
+        canonicalCandidateSkills.has(skill.toLowerCase()) ||
+        canonicalCandidateSkills.has(canonicalReq)
+      );
+    });
 
     // Calculate match percentage
     const matchPercentage = Math.round(
