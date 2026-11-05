@@ -86,3 +86,4 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
     parsedAt: new Date().toISOString()
   };
 }
+

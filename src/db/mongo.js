@@ -83,3 +83,4 @@ const InterviewEvaluationSchema = new mongoose.Schema({
 export const CandidateSession = mongoose.models.CandidateSession || mongoose.model('CandidateSession', CandidateSessionSchema);
 export const LinkedInJob = mongoose.models.LinkedInJob || mongoose.model('LinkedInJob', LinkedInJobSchema);
 export const InterviewEvaluation = mongoose.models.InterviewEvaluation || mongoose.model('InterviewEvaluation', InterviewEvaluationSchema);
+
