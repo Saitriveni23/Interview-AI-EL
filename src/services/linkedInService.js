@@ -162,7 +162,17 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   const t = title.toLowerCase();
   let titleSkills = [];
 
-  if (/front.?end|react|ui|ux|web developer/i.test(t)) {
+  if (/opentext|archive.?center|xecm|archiv/i.test(t)) {
+    titleSkills = ['OpenText', 'OpenText Archive Center', 'OpenText Content Server',
+                   'OpenText xECM', 'SAP ArchiveLink', 'SAP ECC', 'SAP S/4HANA',
+                   'Records Management', 'Compliance', 'Oracle', 'SQL Server',
+                   'Linux', 'Storage Management', 'Agile'];
+  } else if (/sap.*archiv|archiv.*sap|sap.*ecm/i.test(t)) {
+    titleSkills = ['SAP', 'SAP ECC', 'SAP S/4HANA', 'SAP ArchiveLink', 'SAP ILM',
+                   'OpenText Archive Center', 'Oracle', 'Linux', 'Compliance', 'Records Management'];
+  } else if (/\bsap\b|s\/4hana|s4hana|abap|fiori/i.test(t)) {
+    titleSkills = ['SAP', 'SAP ECC', 'SAP S/4HANA', 'SAP HANA', 'SQL', 'Oracle', 'Agile'];
+  } else if (/front.?end|react|ui|ux|web developer/i.test(t)) {
     titleSkills = ['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile'];
   } else if (/full.?stack/i.test(t)) {
     titleSkills = ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Express.js',
@@ -178,7 +188,6 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   } else if (/android|ios|mobile/i.test(t)) {
     titleSkills = ['Android', 'Kotlin', 'REST API', 'Git', 'Agile'];
   } else if (/software engineer|software developer|programmer|developer/i.test(t)) {
-    // Generic software engineer – add a broad technical baseline
     titleSkills = ['JavaScript', 'REST API', 'SQL', 'Git', 'Agile', 'System Design', 'OOP'];
   }
 

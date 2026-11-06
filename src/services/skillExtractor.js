@@ -148,16 +148,54 @@ export const SKILL_DEFINITIONS = {
   "Microservices": ["Microservices", "microservice architecture", "service-oriented architecture", "SOA"],
   "Unit Testing": ["Unit Testing", "automated testing", "test automation", "TDD",
                    "test-driven development", "Jest", "Mocha", "Pytest", "JUnit"],
-  "Agile": ["Agile", "Agile methodology", "agile development", "sprint", "kanban"],
+  "Agile": ["Agile", "Agile methodology", "agile development", "sprint", "kanban", "Agile delivery"],
   "Scrum": ["Scrum", "Scrum master", "scrum methodology"],
 
   // Communication & Soft skills often mentioned alongside technical ones
   "Communication": ["strong communication", "excellent communication", "communication skills",
-                    "stakeholder communication", "cross-functional collaboration"],
+                    "stakeholder communication", "cross-functional collaboration",
+                    "stakeholder management"],
   "Problem Solving": ["problem solving", "problem-solving", "analytical skills", "analytical thinking",
-                      "critical thinking"],
+                      "critical thinking", "troubleshooting", "troubleshoot"],
   "Collaboration": ["collaboration", "teamwork", "team player", "cross-functional teams",
-                    "collaborative environment"]
+                    "collaborative environment"],
+
+  // ── Enterprise / SAP / OpenText ──────────────────────────────────────────
+  "SAP": ["SAP", "SAP system", "SAP platform"],
+  "SAP ECC": ["SAP ECC", "ECC", "SAP R/3", "SAP R3"],
+  "SAP S/4HANA": ["SAP S/4HANA", "S/4HANA", "S4HANA", "SAP S4 HANA", "SAP S4HANA"],
+  "SAP ArchiveLink": ["SAP ArchiveLink", "ArchiveLink", "SAP archive link"],
+  "SAP ILM": ["SAP ILM", "ILM", "Information Lifecycle Management"],
+  "SAP HANA": ["SAP HANA", "HANA database", "HANA DB"],
+  "OpenText": ["OpenText", "Open Text"],
+  "OpenText Archive Center": ["OpenText Archive Center", "Archive Center", "OT Archive Center",
+                               "OpenText archival", "archival center"],
+  "OpenText Content Server": ["OpenText Content Server", "Content Server", "OT Content Server",
+                               "OpenText CS", "OTCS"],
+  "OpenText xECM": ["OpenText xECM", "xECM", "Extended ECM", "OpenText Extended ECM",
+                     "OpenText ECM", "ECM platform"],
+  "Documentum": ["Documentum", "OpenText Documentum", "EMC Documentum"],
+  "SAP VIM": ["SAP VIM", "VIM", "Vendor Invoice Management"],
+
+  // ── Database / Enterprise Storage ─────────────────────────────────────────
+  "Oracle": ["Oracle", "Oracle DB", "Oracle Database", "Oracle RDBMS"],
+  "SQL Server": ["SQL Server", "MS SQL", "Microsoft SQL Server", "MSSQL"],
+  "SAP HANA DB": ["HANA", "SAP HANA"],
+
+  // ── Enterprise Concepts ───────────────────────────────────────────────────
+  "Records Management": ["records management", "records retention", "document retention",
+                          "retention policies", "retention policy", "archival", "archiving",
+                          "data archiving", "document archiving"],
+  "Legal Hold": ["legal hold", "eDiscovery", "e-discovery", "litigation hold"],
+  "Compliance": ["compliance", "regulatory compliance", "data compliance",
+                  "data governance", "GDPR", "data privacy", "audit trail"],
+  "Content Management": ["content management", "ECM", "enterprise content management",
+                          "document management", "DMS"],
+  "Storage Management": ["storage management", "content repository", "content repositories",
+                          "storage solutions", "lifecycle management", "data lifecycle"],
+  "L2/L3 Support": ["L2 support", "L3 support", "L2/L3", "production support",
+                     "technical support", "incident management"],
+  "UNIX": ["Unix", "UNIX", "Unix administration", "Linux/Unix", "Unix/Linux"]
 };
 
 

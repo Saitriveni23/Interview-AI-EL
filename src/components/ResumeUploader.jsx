@@ -131,6 +131,12 @@ export default function ResumeUploader({ onParse, isLoading }) {
   // Helper: infer role-based technical skills from job title (mirrors backend logic)
   const inferTitleSkills = (title) => {
     const t = (title || '').toLowerCase();
+    if (/opentext|archive.?center|xecm|archiv/i.test(t))
+      return ['OpenText', 'OpenText Archive Center', 'OpenText Content Server', 'OpenText xECM',
+              'SAP ArchiveLink', 'SAP ECC', 'SAP S/4HANA', 'Records Management',
+              'Compliance', 'Oracle', 'SQL Server', 'Linux', 'Storage Management', 'Agile'];
+    if (/\bsap\b|s\/4hana|s4hana|abap|fiori/i.test(t))
+      return ['SAP', 'SAP ECC', 'SAP S/4HANA', 'SAP HANA', 'SAP ArchiveLink', 'Oracle', 'SQL', 'Agile'];
     if (/front.?end|react|ui|ux|web developer/i.test(t))
       return ['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile'];
     if (/full.?stack/i.test(t))
