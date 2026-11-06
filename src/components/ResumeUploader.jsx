@@ -23,6 +23,9 @@ import {
   EXPERIENCE_LEVELS,
   getPresetJobDescription
 } from '../data/companyRolePresets.js';
+import { SkillExtractor } from '../services/skillExtractor.js';
+
+const clientSkillExtractor = new SkillExtractor();
 
 const SAMPLE_SENSITIVE_RESUME = `JOHNATHAN DOE
 Email: john.doe.privacy@example.com | Phone: +1 (555) 019-2834
@@ -165,21 +168,29 @@ export default function ResumeUploader({ onParse, isLoading }) {
 
       const data = await response.json();
       if (data.success && data.job) {
-        handleApplyLinkedInJob(data.job);
+        // Always enrich requiredSkills by also running client-side detection
+        // on the raw text — this catches cases where the backend returned few skills
+        const clientDetected = clientSkillExtractor.detectSkills(linkedInRawText);
+        const merged = Array.from(new Set([...data.job.requiredSkills, ...clientDetected]));
+        handleApplyLinkedInJob({ ...data.job, requiredSkills: merged });
       } else {
         throw new Error(data.error || 'Unable to parse LinkedIn job post');
       }
     } catch (err) {
-      // In-browser client fallback parser if backend is offline!
+      // Client-side fallback: detect skills directly from the pasted text
       const lines = linkedInRawText.trim().split('\n').filter(Boolean);
       const title = lines[0] || 'Software Engineer';
       const company = lines[1] || 'Target Company';
+      // Run real skill detection on the pasted text instead of hardcoded list
+      const detectedSkills = clientSkillExtractor.detectSkills(linkedInRawText);
       const fallbackJob = {
         title,
         company,
         location: 'Remote / Hybrid',
         experienceLevel: 'Mid-Level',
-        requiredSkills: ['React', 'Node.js', 'REST API', 'JavaScript', 'SQL'],
+        requiredSkills: detectedSkills.length > 0
+          ? detectedSkills
+          : ['JavaScript', 'REST API', 'SQL', 'Git', 'Node.js'],
         responsibilities: [
           `Build high-scale web products for ${company}.`,
           'Collaborate on REST API services and responsive user interfaces.',
