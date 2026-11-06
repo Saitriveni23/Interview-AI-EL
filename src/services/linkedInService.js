@@ -149,7 +149,36 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   }
 
   // Run skill detection on the FULL raw text for maximum coverage
-  const requiredSkills = skillExtractor.detectSkills(cleanText);
+  let requiredSkills = skillExtractor.detectSkills(cleanText);
+
+  // If too few skills detected, supplement with title-based inference
+  // so that generic LinkedIn posts still produce meaningful skill requirements.
+  if (requiredSkills.length < 3) {
+    const t = title.toLowerCase();
+    if (/front.?end|react|ui|ux|web developer/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile']));
+    } else if (/back.?end|node|python|java(?!script)|api|server/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'Node.js', 'Python', 'REST API', 'SQL', 'PostgreSQL', 'Docker', 'Git', 'Agile']));
+    } else if (/full.?stack/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'JavaScript', 'TypeScript', 'React', 'Node.js', 'REST API', 'SQL', 'Git', 'Docker', 'Agile']));
+    } else if (/devops|cloud|infrastructure|sre/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'Docker', 'Kubernetes', 'AWS', 'CI/CD', 'Linux', 'Git', 'Terraform']));
+    } else if (/data|ml|ai|machine learning|analyst/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'Python', 'SQL', 'Machine Learning', 'Data Analysis', 'Git']));
+    } else if (/android|ios|mobile/i.test(t)) {
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'Android', 'Kotlin', 'REST API', 'Git', 'Agile']));
+    } else {
+      // Generic software engineer fallback
+      requiredSkills = Array.from(new Set([...requiredSkills,
+        'JavaScript', 'REST API', 'SQL', 'Git', 'Agile', 'System Design', 'OOP']));
+    }
+  }
 
   const responsibilities = [];
   for (const line of contentLines) {
@@ -170,7 +199,7 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
     experienceLevel,
     sourceUrl: sourceUrl || 'https://www.linkedin.com/jobs',
     rawJobDescription: cleanText || `Job posting for ${title} at ${company}`,
-    requiredSkills: requiredSkills.length > 0 ? requiredSkills : ['JavaScript', 'REST API', 'SQL', 'Git'],
+    requiredSkills,
     responsibilities: responsibilities.length > 0 ? responsibilities : [
       `Design, build, and deploy production features aligned with ${company} standards.`,
       `Collaborate with cross-functional teams utilizing ${requiredSkills.slice(0, 3).join(', ') || 'modern web technologies'}.`,
