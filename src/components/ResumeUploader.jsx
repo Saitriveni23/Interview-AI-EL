@@ -132,9 +132,19 @@ export default function ResumeUploader({ onParse, isLoading }) {
     setRoleSelect('Custom Role');
     setCustomRole(job.title);
     setExperienceLevel(job.experienceLevel || 'Mid-Level');
-    setJobDescription(
-      `${job.title} at ${job.company}\nLocation: ${job.location}\nRequired Skills: ${job.requiredSkills.join(', ')}\n\nResponsibilities:\n${job.responsibilities.map(r => `• ${r}`).join('\n')}\n\nFull Recruitment Description:\n${job.rawJobDescription}`
-    );
+
+    // Build a rich job description that includes ALL skill keywords so the
+    // backend skill-extractor can find them even if the raw paste was unclear.
+    const skillKeywords = job.requiredSkills.join(', ');
+    const enrichedDesc =
+      `${job.title} at ${job.company}\n` +
+      `Location: ${job.location}\n` +
+      `Required Skills: ${skillKeywords}\n\n` +
+      `Responsibilities:\n${job.responsibilities.map(r => `• ${r}`).join('\n')}\n\n` +
+      `Full Recruitment Description:\n${job.rawJobDescription}\n\n` +
+      `Technical Requirements: ${skillKeywords}`;   // duplicated so detectSkills() always finds them
+
+    setJobDescription(enrichedDesc);
     setLinkedInModalOpen(false);
   };
 

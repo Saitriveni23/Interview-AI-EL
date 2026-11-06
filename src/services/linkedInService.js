@@ -115,8 +115,12 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   let location = 'Remote / Hybrid';
   let experienceLevel = 'Mid-Level';
 
-  const atMatch = lines[0]?.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[-–|]|\s*$)/i);
-  const hiringMatch = lines[0]?.match(/^(.+?)\s+(?:is hiring|hiring for)\s+(.+?)(?:\s*[-–|]|\s*$)/i);
+  // Strip common LinkedIn page chrome that isn't part of the job post
+  const skipPrefixes = ['about the job', 'show more', 'show less', 'apply', 'save', 'report'];
+  const contentLines = lines.filter(l => !skipPrefixes.includes(l.toLowerCase()));
+
+  const atMatch = contentLines[0]?.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[-–|]|\s*$)/i);
+  const hiringMatch = contentLines[0]?.match(/^(.+?)\s+(?:is hiring|hiring for)\s+(.+?)(?:\s*[-–|]|\s*$)/i);
 
   if (atMatch) {
     title = atMatch[1].trim();
@@ -124,12 +128,12 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   } else if (hiringMatch) {
     company = hiringMatch[1].trim();
     title = hiringMatch[2].trim();
-  } else if (lines.length >= 2) {
-    if (lines[0].length < 60 && !lines[0].includes('http')) {
-      title = lines[0];
+  } else if (contentLines.length >= 2) {
+    if (contentLines[0].length < 60 && !contentLines[0].includes('http')) {
+      title = contentLines[0];
     }
-    if (lines[1].length < 50 && !lines[1].includes('http')) {
-      company = lines[1];
+    if (contentLines[1].length < 50 && !contentLines[1].includes('http')) {
+      company = contentLines[1];
     }
   }
 
@@ -144,11 +148,12 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
     experienceLevel = expMatch[1];
   }
 
+  // Run skill detection on the FULL raw text for maximum coverage
   const requiredSkills = skillExtractor.detectSkills(cleanText);
 
   const responsibilities = [];
-  for (const line of lines) {
-    if (/^[•\-\*]\s+/.test(line) || /^(Responsibilities|Requirements|What you'll do|Qualifications):/i.test(line)) {
+  for (const line of contentLines) {
+    if (/^[•\-\*]\s+/.test(line) || /^(Responsibilities|Requirements|What you'll do|Qualifications|You will|You'll):/i.test(line)) {
       const cleaned = line.replace(/^[•\-\*]\s+/, '').trim();
       if (cleaned.length > 20 && cleaned.length < 250) {
         responsibilities.push(cleaned);
