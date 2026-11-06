@@ -19,7 +19,7 @@ function Toggle({ value, onChange }) {
   );
 }
 
-export default function Settings({ darkMode = true, onToggleDarkMode }) {
+export default function Settings({ darkMode = true, onToggleDarkMode, currentUser, onOpenAuth }) {
   const [activeTab, setActiveTab] = useState('preferences'); // 'profile' | 'preferences' | 'account'
   const [notifications, setNotifications] = useState(() => {
     try {
@@ -101,15 +101,24 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
         {/* PROFILE TAB */}
         {activeTab === 'profile' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-indigo-500/20">
-                TR
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-indigo-500/20">
+                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'U'}
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-white">{currentUser?.name || 'Candidate Profile'}</h3>
+                  <p className="text-xs text-slate-400">{currentUser?.headline || 'Software Engineering Candidate'}</p>
+                  <p className="text-xs text-indigo-400 mt-1">{currentUser?.email || 'candidate@example.com'}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-white">Triveni Reddy</h3>
-                <p className="text-xs text-slate-400">Software Engineering Candidate</p>
-                <p className="text-xs text-indigo-400 mt-1">triveni030208@gmail.com</p>
-              </div>
+              <button
+                type="button"
+                onClick={onOpenAuth}
+                className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 rounded-xl text-xs font-semibold transition"
+              >
+                Switch Account / Login
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
@@ -117,7 +126,8 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">Full Name</label>
                 <input
                   type="text"
-                  defaultValue="Triveni Reddy"
+                  key={currentUser?.name}
+                  defaultValue={currentUser?.name || 'Triveni Reddy'}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-indigo-500"
                 />
               </div>
@@ -125,7 +135,8 @@ export default function Settings({ darkMode = true, onToggleDarkMode }) {
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email Address</label>
                 <input
                   type="email"
-                  defaultValue="triveni030208@gmail.com"
+                  key={currentUser?.email}
+                  defaultValue={currentUser?.email || 'triveni030208@gmail.com'}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-indigo-500"
                 />
               </div>

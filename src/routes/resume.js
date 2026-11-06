@@ -8,7 +8,7 @@ import { generateGeminiQuestions } from '../services/geminiService.js';
 import { evaluateInterview } from '../services/interviewEvaluationService.js';
 import { getPresetJobDescription } from '../data/companyRolePresets.js';
 import { parseLinkedInJob } from '../services/linkedInService.js';
-import { CandidateSession, LinkedInJob, InterviewEvaluation, isDBConnected } from '../db/mongo.js';
+import { User, CandidateSession, LinkedInJob, InterviewEvaluation, isDBConnected } from '../db/mongo.js';
 
 const router = Router();
 
@@ -22,6 +22,89 @@ const upload = multer({
 const redactor = new ResumeRedactor();
 const skillExtractor = new SkillExtractor();
 const llmService = new LLMService();
+
+// ==========================================
+// 0. USER AUTHENTICATION & PROFILE ENDPOINTS
+// ==========================================
+
+router.post('/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!email || !password || !name) {
+      return res.status(400).json({ success: false, error: 'Name, email, and password are required.' });
+    }
+
+    if (isDBConnected()) {
+      const existing = await User.findOne({ email: email.toLowerCase().trim() });
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'An account with this email already exists.' });
+      }
+
+      const user = await User.create({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        password: Buffer.from(password).toString('base64'),
+        headline: 'Software Engineering Candidate'
+      });
+
+      return res.json({
+        success: true,
+        user: { id: user._id, name: user.name, email: user.email, headline: user.headline }
+      });
+    }
+
+    // In-memory / edge response if MongoDB is offline
+    return res.json({
+      success: true,
+      user: {
+        id: `usr_${Date.now()}`,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        headline: 'Software Engineering Candidate'
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required.' });
+    }
+
+    if (isDBConnected()) {
+      const user = await User.findOne({
+        email: email.toLowerCase().trim(),
+        password: Buffer.from(password).toString('base64')
+      });
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      }
+
+      return res.json({
+        success: true,
+        user: { id: user._id, name: user.name, email: user.email, headline: user.headline }
+      });
+    }
+
+    // Edge offline fallback login
+    return res.json({
+      success: true,
+      user: {
+        id: `usr_${Date.now()}`,
+        name: email.split('@')[0],
+        email: email.toLowerCase().trim(),
+        headline: 'Software Engineering Candidate'
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ==========================================
 // 1. RESUME UPLOAD AND SKILL ANALYSIS

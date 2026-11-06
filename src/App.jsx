@@ -6,6 +6,7 @@ import ResumeUploader from './components/ResumeUploader';
 import RedactionViewer from './components/RedactionViewer';
 import SkillParserView from './components/SkillParserView';
 import InterviewPanel from './components/InterviewPanel';
+import AuthModal from './components/AuthModal';
 import { analyzeResumeClientSide } from './services/clientFallbackService.js';
 import { ShieldAlert, Award, MessageSquare, BookOpen, Plus, ChevronRight } from 'lucide-react';
 
@@ -326,6 +327,23 @@ export default function App() {
     } catch (_) { return null; }
   });
 
+  // Current authenticated user account state
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const u = localStorage.getItem('interview-ai-current-user');
+      return u ? JSON.parse(u) : { name: 'Triveni Reddy', email: 'triveni030208@gmail.com', headline: 'Software Engineering Candidate' };
+    } catch (_) {
+      return { name: 'Triveni Reddy', email: 'triveni030208@gmail.com', headline: 'Software Engineering Candidate' };
+    }
+  });
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem('interview-ai-current-user');
+    setCurrentUser(null);
+  };
+
   // ── Save a new session record ──
   const saveSessionRecord = (data) => {
     const record = {
@@ -476,6 +494,8 @@ export default function App() {
           <Settings
             darkMode={darkMode}
             onToggleDarkMode={handleToggleDarkMode}
+            currentUser={currentUser}
+            onOpenAuth={() => setAuthModalOpen(true)}
           />
         );
 
@@ -510,8 +530,18 @@ export default function App() {
         activePage={activePage}
         onNavigate={handleNavigate}
         parseResult={parseResult}
+        currentUser={currentUser}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
       {renderPage()}
+
+      {/* Account Login & Registration Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={(user) => setCurrentUser(user)}
+      />
     </div>
   );
 }

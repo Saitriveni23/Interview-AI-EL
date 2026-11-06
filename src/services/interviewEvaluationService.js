@@ -482,7 +482,7 @@ IMPORTANT RULES:
    to the question and marking criterion.
 5. Give partial credit for correct but incomplete answers.
 6. Incorrect or irrelevant statements receive no credit.
-7. Random letters or meaningless answers receive zero.
+7. Random letters, gibberish (e.g. "asdf", "qwerty", repeated words, "idk"), completely off-topic or meaningless answers MUST receive zero (0/10).
 8. Never invent details missing from an answer.
 9. Do not infer protected characteristics or personality.
 10. Keep scoring independent of resume consistency.
@@ -490,7 +490,8 @@ IMPORTANT RULES:
     resume does not contain a particular detail.
 12. A potential resume contradiction must be reported
     separately and must not automatically reduce marks.
-13. Return valid JSON only.
+13. If an answer fails to address the question asked, award a maximum of 0 to 1 mark.
+14. Return valid JSON only.
 
 SCORING METHOD:
 

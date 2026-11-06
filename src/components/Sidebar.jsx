@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export default function Sidebar({ activePage, onNavigate, parseResult }) {
+export default function Sidebar({ activePage, onNavigate, parseResult, currentUser, onOpenAuth, onLogout }) {
   return (
     <aside className="w-56 min-h-screen bg-slate-900 border-r border-slate-800/80 flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
 
@@ -72,16 +72,31 @@ export default function Sidebar({ activePage, onNavigate, parseResult }) {
 
       {/* User section */}
       <div className="px-3 py-3 border-t border-slate-800">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800 transition cursor-pointer group">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-            U
+        {currentUser ? (
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800 transition group">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              {currentUser.name ? currentUser.name.slice(0, 2).toUpperCase() : 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-200 truncate">{currentUser.name || 'Candidate'}</p>
+              <p className="text-[10px] text-slate-500 truncate">{currentUser.email || 'Online'}</p>
+            </div>
+            <button
+              onClick={onLogout}
+              title="Log Out"
+              className="p-1 hover:bg-slate-700/60 rounded-lg text-slate-500 hover:text-red-400 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-200 truncate">You</p>
-            <p className="text-[10px] text-slate-500">Candidate</p>
-          </div>
-          <LogOut className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition flex-shrink-0" />
-        </div>
+        ) : (
+          <button
+            onClick={onOpenAuth}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/20"
+          >
+            <span>Log In / Sign Up</span>
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -26,6 +26,18 @@ export function isDBConnected() {
 }
 
 // --------------------------------------------------------------------------
+// 0. User Account Model
+// --------------------------------------------------------------------------
+const UserSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true, index: true },
+  password: { type: String, required: true }, // Simple hashed or base64 credential
+  name: { type: String, required: true },
+  headline: { type: String, default: 'Software Engineering Candidate' },
+  avatarUrl: String,
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+// --------------------------------------------------------------------------
 // 1. Candidate & Resume Model
 // --------------------------------------------------------------------------
 const CandidateSessionSchema = new mongoose.Schema({
@@ -80,6 +92,7 @@ const InterviewEvaluationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+export const User = mongoose.models.User || mongoose.model('User', UserSchema);
 export const CandidateSession = mongoose.models.CandidateSession || mongoose.model('CandidateSession', CandidateSessionSchema);
 export const LinkedInJob = mongoose.models.LinkedInJob || mongoose.model('LinkedInJob', LinkedInJobSchema);
 export const InterviewEvaluation = mongoose.models.InterviewEvaluation || mongoose.model('InterviewEvaluation', InterviewEvaluationSchema);

@@ -552,6 +552,38 @@ function analyzeSTAR(text) {
 // ==========================================
 // Intelligent Client-Side Evaluation Engine (Fallback when cloud LLM is unconfigured/cold)
 // ==========================================
+function isGibberishOrMeaningless(text, question) {
+  if (!text || text.trim().length < 5) return true;
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+
+  // Common random phrases or admissions of not knowing
+  const randomPhrases = [
+    'asdf', 'qwerty', 'random', 'blah', 'test', 'dont know', "don't know",
+    'no idea', 'idk', 'nothing', 'na', 'n/a', 'skip', 'pass', 'whatever',
+    'xyz', 'abc', 'hello', 'hi'
+  ];
+
+  if (randomPhrases.includes(lower)) return true;
+
+  // Excessive repetition (e.g. "aaaaaaa", "asdfasdf", "test test test")
+  if (/^(.)\1{4,}/.test(clean)) return true; // repeated single char
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= 2 && words.every(w => randomPhrases.includes(w.toLowerCase()))) return true;
+
+  // Repetitive word spam (e.g. "python python python")
+  if (words.length >= 3) {
+    const unique = new Set(words.map(w => w.toLowerCase()));
+    if (unique.size === 1) return true;
+  }
+
+  // Extreme ratio of non-alphabetic noise
+  const alphaChars = clean.replace(/[^a-zA-Z]/g, '').length;
+  if (clean.length >= 8 && alphaChars / clean.length < 0.35) return true;
+
+  return false;
+}
+
 function buildIntelligentClientEvaluation(answers, redactedResumeText = '', targetInfo = {}) {
   const role = targetInfo?.role || 'Full Stack Developer';
   const company = targetInfo?.company || 'Google';
@@ -561,58 +593,90 @@ function buildIntelligentClientEvaluation(answers, redactedResumeText = '', targ
     const wordCount = text.split(/\s+/).filter(Boolean).length;
     const lower = text.toLowerCase();
 
-    // Base score based on effort and length (6 to 8 base)
-    let baseScore = 7;
-    if (wordCount >= 50) baseScore += 2;
-    else if (wordCount >= 25) baseScore += 1;
-    else if (wordCount < 10) baseScore -= 1;
+    // STRICT GIBBERISH / RANDOM STUFF DETECTION (Addresses Evaluator Issue #4)
+    if (isGibberishOrMeaningless(text, item.question)) {
+      const rubrics = DEMO_RUBRICS[item.category] || DEMO_RUBRICS.Technical;
+      const rubricBreakdown = rubrics.map(([label, maxScore], criterionIndex) => ({
+        key: `${criterionIndex}`,
+        label,
+        score: 0,
+        maxScore,
+        explanation: `No credit awarded: response was identified as random, irrelevant, or non-responsive.`
+      }));
+
+      return {
+        questionNumber: index + 1,
+        category: item.category,
+        question: item.question,
+        answer: item.answer,
+        score: 0,
+        rubricBreakdown,
+        feedback: `Zero score: Answer provided does not address the question and contains meaningless or random text.`,
+        improvement: `Answer technical and behavioral questions using relevant domain concepts, architectural examples, or the STAR framework.`
+      };
+    }
+
+    // Meaningful answer grading based on substance & domain terms
+    let baseScore = 4; // Start from honest base
+    if (wordCount >= 40) baseScore += 2;
+    else if (wordCount >= 20) baseScore += 1;
+    else if (wordCount < 8) baseScore -= 1;
 
     let specificFeedback = '';
     let improvement = '';
 
     if (item.category === 'Technical') {
-      const hasTechTerms = /(api|component|state|hook|async|await|database|sql|nosql|query|performance|cache|latency|scale|docker|architecture|algorithm|complexity|o\(|function|class|index)/i.test(lower);
-      if (hasTechTerms) baseScore += 1;
+      const hasTechTerms = /(api|component|state|hook|async|await|database|sql|nosql|query|performance|cache|latency|scale|docker|architecture|algorithm|complexity|o\(|function|class|index|rest|crud|schema|endpoint)/i.test(lower);
+      if (hasTechTerms) baseScore += 2;
+      else baseScore -= 1;
+
       specificFeedback = hasTechTerms
         ? `Strong technical articulation. You demonstrated clear architectural and domain understanding suitable for ${role} benchmarks at ${company}.`
-        : `Answer demonstrates good foundational understanding. Incorporating specific architectural mechanisms or complexity trade-offs would elevate it further.`;
+        : `Answer lacks core technical depth or domain keywords for ${role}.`;
       improvement = `Deepen code-level specifics by detailing error handling, edge cases, or asymptotic time/space complexity.`;
     } else if (item.category === 'Behavioral') {
       const star = analyzeSTAR(text);
-      if (star && star.count >= 3) baseScore += 1;
+      if (star && star.count >= 3) baseScore += 2;
+      else if (star && star.count >= 2) baseScore += 1;
+      else baseScore -= 1;
+
       specificFeedback = star && star.count >= 3
         ? `Excellent STAR structure! Clearly outlined the situation, specific actions taken, and measurable impact.`
-        : `Good response. Enhancing the Result component with quantified metrics (e.g., % improvement, hours saved) will make your story more compelling.`;
+        : `Answer could be strengthened by explicitly outlining your specific Action taken and quantifiable Result.`;
       improvement = `Adopt the STAR framework explicitly: define the Situation, your specific Task, individual Actions taken, and quantifiable Results achieved.`;
     } else if (item.category === 'Situational') {
       const hasProblemSolving = /(first|analyze|investigate|collaborate|communicate|prioritize|trade-off|monitor|root cause|mitigat)/i.test(lower);
-      if (hasProblemSolving) baseScore += 1;
+      if (hasProblemSolving) baseScore += 2;
       specificFeedback = hasProblemSolving
         ? `Demonstrates mature engineering judgment and structured troubleshooting under realistic workplace conditions.`
-        : `Solid common-sense reasoning. Consider mentioning team communication channels and post-mortem mitigation strategies.`;
+        : `Consider mentioning structured debugging steps, monitoring metrics, and root cause mitigation strategies.`;
       improvement = `Highlight stakeholder communication and proactive preventive measures alongside immediate technical fixes.`;
     } else {
       // Resume-Based
       const hasSpecifics = /(project|built|team|designed|implemented|stack|system|lead|metric|users|feature)/i.test(lower);
-      if (hasSpecifics) baseScore += 1;
-      specificFeedback = `Good ownership demonstrated regarding your project contributions and architectural decisions.`;
+      if (hasSpecifics) baseScore += 2;
+      specificFeedback = hasSpecifics
+        ? `Good ownership demonstrated regarding your project contributions and architectural decisions.`
+        : `Provide more specific technical metrics and personal ownership regarding your project experience.`;
       improvement = `Tie your project decisions back to business outcomes and technical metrics you personally influenced.`;
     }
 
-    const finalScore = Math.max(6, Math.min(10, baseScore));
+    const finalScore = Math.max(1, Math.min(10, baseScore));
 
-    // Rubric breakdown
+    // Rubric breakdown proportional to score
     let remaining = finalScore;
     const rubrics = DEMO_RUBRICS[item.category] || DEMO_RUBRICS.Technical;
     const rubricBreakdown = rubrics.map(([label, maxScore], criterionIndex) => {
-      const cScore = Math.min(maxScore, Math.max(1, Math.round((remaining / (rubrics.length * 2)) * maxScore) || 1));
+      const cScore = Math.min(maxScore, Math.max(0, Math.round((remaining / (rubrics.length * 2)) * maxScore)));
       remaining = Math.max(0, remaining - cScore);
       return {
         key: `${criterionIndex}`,
         label,
         score: Math.min(maxScore, cScore),
         maxScore,
-        explanation: `Demonstrated competent proficiency in ${label.toLowerCase()} aligning with ${company} standards.`
+        explanation: cScore > 0
+          ? `Demonstrated competent proficiency in ${label.toLowerCase()} aligning with ${company} standards.`
+          : `Insufficient technical evidence provided for ${label.toLowerCase()}.`
       };
     });
 
