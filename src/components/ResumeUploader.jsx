@@ -66,7 +66,6 @@ export default function ResumeUploader({ onParse, isLoading }) {
   // LinkedIn Recruitment Import States
   const [linkedInModalOpen, setLinkedInModalOpen] = useState(false);
   const [linkedInRawText, setLinkedInRawText] = useState('');
-  const [linkedInUrl, setLinkedInUrl] = useState('');
   const [parsedJobTable, setParsedJobTable] = useState(null);
 
   // Study Plan Engine Preference: 'gemini' (Dynamic AI) vs 'fixed' (Curated Syllabus)
@@ -150,8 +149,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rawJobText: linkedInRawText,
-          sourceUrl: linkedInUrl
+          rawJobText: linkedInRawText
         })
       });
 
@@ -635,19 +633,6 @@ export default function ResumeUploader({ onParse, isLoading }) {
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  LinkedIn Job URL (Optional):
-                </label>
-                <input
-                  type="url"
-                  value={linkedInUrl}
-                  onChange={(e) => setLinkedInUrl(e.target.value)}
-                  placeholder="https://www.linkedin.com/jobs/view/..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-xs font-semibold text-slate-300">
