@@ -128,6 +128,26 @@ export default function ResumeUploader({ onParse, isLoading }) {
     );
   };
 
+  // Helper: infer role-based technical skills from job title (mirrors backend logic)
+  const inferTitleSkills = (title) => {
+    const t = (title || '').toLowerCase();
+    if (/front.?end|react|ui|ux|web developer/i.test(t))
+      return ['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile'];
+    if (/full.?stack/i.test(t))
+      return ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Express.js', 'REST API', 'SQL', 'MongoDB', 'Git', 'Docker', 'Agile'];
+    if (/back.?end|node|api\s+developer|server.?side/i.test(t))
+      return ['Node.js', 'Python', 'REST API', 'SQL', 'PostgreSQL', 'Docker', 'Git', 'Agile'];
+    if (/devops|cloud|infrastructure|sre|platform/i.test(t))
+      return ['Docker', 'Kubernetes', 'AWS', 'CI/CD', 'Linux', 'Git', 'Terraform'];
+    if (/data scientist|machine learning|ml engineer|ai engineer/i.test(t))
+      return ['Python', 'SQL', 'Machine Learning', 'Data Analysis', 'Git', 'NumPy', 'Pandas'];
+    if (/android|ios|mobile/i.test(t))
+      return ['Android', 'Kotlin', 'REST API', 'Git', 'Agile'];
+    if (/software engineer|software developer|programmer|developer/i.test(t))
+      return ['JavaScript', 'REST API', 'SQL', 'Git', 'Agile', 'System Design', 'OOP'];
+    return [];
+  };
+
   const handleApplyLinkedInJob = (job) => {
     setParsedJobTable(job);
     setCompanySelect('Custom Company');
@@ -136,16 +156,19 @@ export default function ResumeUploader({ onParse, isLoading }) {
     setCustomRole(job.title);
     setExperienceLevel(job.experienceLevel || 'Mid-Level');
 
-    // Build a rich job description that includes ALL skill keywords so the
-    // backend skill-extractor can find them even if the raw paste was unclear.
-    const skillKeywords = job.requiredSkills.join(', ');
+    // Always merge: text-detected skills + title-inferred technical skills
+    const titleSkills = inferTitleSkills(job.title);
+    const allSkills = Array.from(new Set([...job.requiredSkills, ...titleSkills]));
+
+    // Build a rich job description so the backend detectSkills() always finds them
+    const skillKeywords = allSkills.join(', ');
     const enrichedDesc =
       `${job.title} at ${job.company}\n` +
       `Location: ${job.location}\n` +
       `Required Skills: ${skillKeywords}\n\n` +
       `Responsibilities:\n${job.responsibilities.map(r => `• ${r}`).join('\n')}\n\n` +
       `Full Recruitment Description:\n${job.rawJobDescription}\n\n` +
-      `Technical Requirements: ${skillKeywords}`;   // duplicated so detectSkills() always finds them
+      `Technical Requirements: ${skillKeywords}`;
 
     setJobDescription(enrichedDesc);
     setLinkedInModalOpen(false);

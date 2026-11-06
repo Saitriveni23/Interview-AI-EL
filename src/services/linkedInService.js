@@ -148,37 +148,44 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
     experienceLevel = expMatch[1];
   }
 
-  // Run skill detection on the FULL raw text for maximum coverage
-  let requiredSkills = skillExtractor.detectSkills(cleanText);
+  // Soft-skill-only keywords – these alone don't count as "technical" requirements
+  const SOFT_SKILLS = new Set(['Communication', 'Problem Solving', 'Collaboration']);
 
-  // If too few skills detected, supplement with title-based inference
-  // so that generic LinkedIn posts still produce meaningful skill requirements.
-  if (requiredSkills.length < 3) {
-    const t = title.toLowerCase();
-    if (/front.?end|react|ui|ux|web developer/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile']));
-    } else if (/back.?end|node|python|java(?!script)|api|server/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'Node.js', 'Python', 'REST API', 'SQL', 'PostgreSQL', 'Docker', 'Git', 'Agile']));
-    } else if (/full.?stack/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'JavaScript', 'TypeScript', 'React', 'Node.js', 'REST API', 'SQL', 'Git', 'Docker', 'Agile']));
-    } else if (/devops|cloud|infrastructure|sre/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'Docker', 'Kubernetes', 'AWS', 'CI/CD', 'Linux', 'Git', 'Terraform']));
-    } else if (/data|ml|ai|machine learning|analyst/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'Python', 'SQL', 'Machine Learning', 'Data Analysis', 'Git']));
-    } else if (/android|ios|mobile/i.test(t)) {
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'Android', 'Kotlin', 'REST API', 'Git', 'Agile']));
-    } else {
-      // Generic software engineer fallback
-      requiredSkills = Array.from(new Set([...requiredSkills,
-        'JavaScript', 'REST API', 'SQL', 'Git', 'Agile', 'System Design', 'OOP']));
-    }
+  // Run skill detection on the FULL raw text for maximum coverage
+  let detectedSkills = skillExtractor.detectSkills(cleanText);
+
+  // Count how many TECHNICAL skills were found (exclude pure soft skills)
+  const technicalDetected = detectedSkills.filter(s => !SOFT_SKILLS.has(s));
+
+  // Always infer role-based technical skills from the job title so the
+  // skills breakdown is never empty or soft-skill-only.
+  const t = title.toLowerCase();
+  let titleSkills = [];
+
+  if (/front.?end|react|ui|ux|web developer/i.test(t)) {
+    titleSkills = ['HTML', 'CSS', 'JavaScript', 'TypeScript', 'React', 'REST API', 'Git', 'Agile'];
+  } else if (/full.?stack/i.test(t)) {
+    titleSkills = ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Express.js',
+                   'REST API', 'SQL', 'MongoDB', 'Git', 'Docker', 'Agile'];
+  } else if (/back.?end|node|api\s+developer|server.?side/i.test(t)) {
+    titleSkills = ['Node.js', 'Python', 'REST API', 'SQL', 'PostgreSQL', 'Docker', 'Git', 'Agile'];
+  } else if (/devops|cloud|infrastructure|sre|platform/i.test(t)) {
+    titleSkills = ['Docker', 'Kubernetes', 'AWS', 'CI/CD', 'Linux', 'Git', 'Terraform'];
+  } else if (/data scientist|machine learning|ml engineer|ai engineer/i.test(t)) {
+    titleSkills = ['Python', 'SQL', 'Machine Learning', 'Data Analysis', 'Git', 'NumPy', 'Pandas'];
+  } else if (/data engineer|etl|pipeline/i.test(t)) {
+    titleSkills = ['Python', 'SQL', 'ETL', 'Apache Spark', 'Data Engineering', 'Git'];
+  } else if (/android|ios|mobile/i.test(t)) {
+    titleSkills = ['Android', 'Kotlin', 'REST API', 'Git', 'Agile'];
+  } else if (/software engineer|software developer|programmer|developer/i.test(t)) {
+    // Generic software engineer – add a broad technical baseline
+    titleSkills = ['JavaScript', 'REST API', 'SQL', 'Git', 'Agile', 'System Design', 'OOP'];
   }
+
+  // Always MERGE title-inferred skills with text-detected skills.
+  // This ensures technical skills always appear even when the LinkedIn post
+  // uses abstract language that the extractor cannot parse.
+  const requiredSkills = Array.from(new Set([...detectedSkills, ...titleSkills]));
 
   const responsibilities = [];
   for (const line of contentLines) {
