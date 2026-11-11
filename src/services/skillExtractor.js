@@ -199,6 +199,21 @@ export const SKILL_DEFINITIONS = {
 };
 
 
+// Soft skills list for separating technical stack vs. interpersonal / process skills
+export const SOFT_SKILLS_SET = new Set([
+  "Communication",
+  "Problem Solving",
+  "Collaboration",
+  "Agile",
+  "Scrum",
+  "L2/L3 Support"
+]);
+
+export function isSoftSkill(skillName) {
+  if (!skillName) return false;
+  return SOFT_SKILLS_SET.has(skillName);
+}
+
 export class SkillExtractor {
 
   /**
@@ -241,6 +256,40 @@ export class SkillExtractor {
 
       if (found) {
         detectedSkills.push(canonicalSkill);
+      }
+    }
+
+    // Heuristic rule-based pattern extractor for unlisted skills (No LLM required)
+    // Extracts phrases following standard requirement prefixes:
+    const patternRegex = /(?:experience with|experience in|hands-on with|hands-on experience with|knowledge of|proficient in|proficiency in|exposure to|understanding of|skills in)\s+([A-Za-z0-9+#./-]{2,25}(?:\s+[A-Za-z0-9+#./-]{2,20})?)/gi;
+    const stopWords = new Set([
+      'the', 'a', 'an', 'our', 'all', 'any', 'such', 'various', 'related', 'different',
+      'team', 'teams', 'work', 'working', 'ability', 'candidate', 'strong', 'excellent',
+      'good', 'solid', 'demonstrated', 'proven', 'relevant', 'general', 'day', 'daily'
+    ]);
+
+    let match;
+    while ((match = patternRegex.exec(text)) !== null) {
+      const candidatePhrase = match[1]?.trim();
+      if (!candidatePhrase) continue;
+      const firstWord = candidatePhrase.split(/\s+/)[0].toLowerCase();
+      if (stopWords.has(firstWord) || candidatePhrase.length < 3) continue;
+
+      // Check if already covered by an existing canonical detection
+      const canonical = this.getCanonicalSkill(candidatePhrase);
+      if (canonical) {
+        if (!detectedSkills.includes(canonical)) {
+          detectedSkills.push(canonical);
+        }
+      } else {
+        // Capitalize properly and push if not duplicate
+        const formatted = candidatePhrase
+          .split(' ')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ');
+        if (!detectedSkills.some(s => s.toLowerCase() === formatted.toLowerCase())) {
+          detectedSkills.push(formatted);
+        }
       }
     }
 

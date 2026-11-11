@@ -23,9 +23,14 @@ import {
   Briefcase,
   BarChart2,
   Table2,
-  BookMarked
+  BookMarked,
+  Printer,
+  Plus,
+  X,
+  Filter
 } from 'lucide-react';
 import { getStudyMaterialForSkill, getStudyMaterialsForSkills } from '../data/studyMaterials.js';
+import { isSoftSkill } from '../services/skillExtractor.js';
 
 // ── Circular progress ring ──
 function RingProgress({ pct = 0, size = 96, stroke = 8, color = '#6366f1' }) {
@@ -89,7 +94,71 @@ export default function SkillParserView({
       return saved ? JSON.parse(saved) : {};
     } catch (_) { return {}; }
   });
-  const [copiedSyllabus, setCopiedSyllabus] = useState(false);
+  // ── Dynamic User-Editable Skills State ──
+  const [editableCandidateSkills, setEditableCandidateSkills] = useState(() => candidateProfile?.skills || []);
+  const [editableRequiredSkills, setEditableRequiredSkills] = useState(() => {
+    return deltaAnalysis?.requiredSkills || [
+      ...(deltaAnalysis?.matchingSkills || []),
+      ...(deltaAnalysis?.missingSkills || [])
+    ];
+  });
+  const [newCandidateSkillInput, setNewCandidateSkillInput] = useState('');
+  const [newRequiredSkillInput, setNewRequiredSkillInput] = useState('');
+  const [showAddCandidateInput, setShowAddCandidateInput] = useState(false);
+  const [showAddRequiredInput, setShowAddRequiredInput] = useState(false);
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState('all'); // 'all' | 'technical' | 'soft'
+
+  // Sync state if props change
+  useEffect(() => {
+    if (candidateProfile?.skills) {
+      setEditableCandidateSkills(candidateProfile.skills);
+    }
+  }, [candidateProfile?.skills]);
+
+  useEffect(() => {
+    if (deltaAnalysis) {
+      const initialReq = deltaAnalysis.requiredSkills?.length
+        ? deltaAnalysis.requiredSkills
+        : [
+            ...(deltaAnalysis.matchingSkills || []),
+            ...(deltaAnalysis.missingSkills || [])
+          ];
+      setEditableRequiredSkills(initialReq);
+    }
+  }, [deltaAnalysis]);
+
+  const handleAddCandidateSkill = (e) => {
+    e?.preventDefault();
+    const trimmed = newCandidateSkillInput.trim();
+    if (trimmed && !editableCandidateSkills.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+      setEditableCandidateSkills(prev => [...prev, trimmed]);
+      setNewCandidateSkillInput('');
+      setShowAddCandidateInput(false);
+    }
+  };
+
+  const handleRemoveCandidateSkill = (skillToRemove) => {
+    setEditableCandidateSkills(prev => prev.filter(s => s.toLowerCase() !== skillToRemove.toLowerCase()));
+  };
+
+  const handleAddRequiredSkill = (e) => {
+    e?.preventDefault();
+    const trimmed = newRequiredSkillInput.trim();
+    if (trimmed && !editableRequiredSkills.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
+      setEditableRequiredSkills(prev => [...prev, trimmed]);
+      setNewRequiredSkillInput('');
+      setShowAddRequiredInput(false);
+    }
+  };
+
+  const handleRemoveRequiredSkill = (skillToRemove) => {
+    setEditableRequiredSkills(prev => prev.filter(s => s.toLowerCase() !== skillToRemove.toLowerCase()));
+  };
+
+  // 1-Click Print / PDF Report handler
+  const handlePrintReport = () => {
+    window.print();
+  };
 
   const toggleTask = (taskId) => {
     setCompletedTasks((prev) => ({
@@ -344,13 +413,39 @@ const minimumStudyWeeks =
 
   if (!candidateProfile || !deltaAnalysis) return null;
 
-  const matchPct = deltaAnalysis.matchPercentage ?? 0;
+  // Dynamically recalculated based on user-edited candidate & required skills:
+  const candidateSkillsLowerSet = new Set(editableCandidateSkills.map(s => s.toLowerCase()));
+  const effectiveMatchingSkills = editableRequiredSkills.filter(skill =>
+    candidateSkillsLowerSet.has(skill.toLowerCase())
+  );
+  const effectiveMissingSkills = editableRequiredSkills.filter(skill =>
+    !candidateSkillsLowerSet.has(skill.toLowerCase())
+  );
+  const matchPct = editableRequiredSkills.length === 0
+    ? 100
+    : Math.round((effectiveMatchingSkills.length / editableRequiredSkills.length) * 100);
+
+  // Technical vs Soft Skills breakdown
+  const techRequired = editableRequiredSkills.filter(s => !isSoftSkill(s));
+  const techMatching = effectiveMatchingSkills.filter(s => !isSoftSkill(s));
+  const techMissing = effectiveMissingSkills.filter(s => !isSoftSkill(s));
+  const techMatchPct = techRequired.length === 0
+    ? 100
+    : Math.round((techMatching.length / techRequired.length) * 100);
+
+  const softRequired = editableRequiredSkills.filter(s => isSoftSkill(s));
+  const softMatching = effectiveMatchingSkills.filter(s => isSoftSkill(s));
+  const softMissing = effectiveMissingSkills.filter(s => isSoftSkill(s));
+
+  // Skills filtered by category for rendering
+  const filteredRequiredSkills = editableRequiredSkills.filter(s => {
+    if (skillCategoryFilter === 'technical') return !isSoftSkill(s);
+    if (skillCategoryFilter === 'soft') return isSoftSkill(s);
+    return true;
+  });
+
+  const matchingSet = new Set(effectiveMatchingSkills.map(s => s.toLowerCase()));
   const requiredLevel = getRequiredLevel(effectiveLevel);
-  const allRequiredSkills = deltaAnalysis.requiredSkills || [
-    ...(deltaAnalysis.matchingSkills || []),
-    ...(deltaAnalysis.missingSkills || [])
-  ];
-  const matchingSet = new Set(deltaAnalysis.matchingSkills || []);
 
   return (
     <div className="space-y-6">
@@ -360,27 +455,39 @@ const minimumStudyWeeks =
           ═══════════════════════════════════════════════════════════ */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
 
-        {/* Tab navigation */}
-        <div className="flex border-b border-slate-800 px-4 pt-4 gap-1">
-          {[
-            { id: 'analysis', label: 'Skills Analysis', icon: Award },
-            { id: 'gaps',     label: 'Gap Analysis',    icon: BarChart2 },
-            { id: 'plan',     label: 'Documentation Plan', icon: BookMarked }
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setMainTab(id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-xl border-b-2 transition -mb-px ${
-                mainTab === id
-                  ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
+        {/* Tab navigation + Export action */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 px-4 pt-4 gap-2">
+          <div className="flex gap-1 overflow-x-auto pb-px">
+            {[
+              { id: 'analysis', label: 'Skills Analysis', icon: Award },
+              { id: 'gaps',     label: 'Gap Analysis',    icon: BarChart2 },
+              { id: 'plan',     label: 'Documentation Plan', icon: BookMarked }
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMainTab(id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-xl border-b-2 transition -mb-px whitespace-nowrap ${
+                  mainTab === id
+                    ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5'
+                    : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handlePrintReport}
+            className="self-end sm:self-center mb-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition shadow-sm"
+            title="Print or Save Assessment as PDF"
+          >
+            <Printer className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Export / Print PDF</span>
+          </button>
         </div>
 
         {/* ─────── TAB: Skills Analysis ─────── */}
@@ -453,19 +560,54 @@ const minimumStudyWeeks =
 
               {/* Stats chips */}
               <div className="flex md:flex-col gap-3 flex-shrink-0">
-                <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center">
-                  <span className="block text-[10px] text-slate-400 uppercase font-semibold">Skill Gaps</span>
-                  <span className="text-base font-bold text-amber-400 font-mono">
-                    {deltaAnalysis.missingSkills?.length || 0}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-semibold">Tech Match</span>
+                  <span className="text-base font-bold text-indigo-400 font-mono">
+                    {techMatchPct}%
                   </span>
                 </div>
-                <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-center">
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-semibold">Skill Gaps</span>
+                  <span className="text-base font-bold text-amber-400 font-mono">
+                    {effectiveMissingSkills.length}
+                  </span>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-center">
                   <span className="block text-[10px] text-slate-400 uppercase font-semibold">Matched</span>
                   <span className="text-base font-bold text-emerald-400 font-mono">
-                    {deltaAnalysis.matchingSkills?.length || 0}
+                    {effectiveMatchingSkills.length}
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Category Filter Pills (Deterministic Technical vs Soft Skills separation) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="font-semibold text-slate-300">Filter View:</span>
+                {[
+                  { id: 'all', label: `All (${editableRequiredSkills.length})` },
+                  { id: 'technical', label: `Technical Stack (${techRequired.length})` },
+                  { id: 'soft', label: `Soft & Process (${softRequired.length})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSkillCategoryFilter(tab.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                      skillCategoryFilter === tab.id
+                        ? 'bg-indigo-600 text-white font-bold shadow-sm'
+                        : 'bg-slate-800/80 hover:bg-slate-750 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-slate-500 italic">
+                *Click (+) to manually add or (×) to remove any skill
+              </span>
             </div>
 
             {/* Skills Breakdown — horizontal bars per required skill */}
@@ -473,17 +615,69 @@ const minimumStudyWeeks =
 
               {/* Candidate skills */}
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <Award className="w-3.5 h-3.5 text-indigo-400" />
-                  Your Skills ({candidateProfile.skills?.length || 0})
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Award className="w-3.5 h-3.5 text-indigo-400" />
+                    Your Skills ({editableCandidateSkills.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCandidateInput(prev => !prev)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Skill</span>
+                  </button>
+                </div>
+
+                {showAddCandidateInput && (
+                  <form onSubmit={handleAddCandidateSkill} className="flex gap-2 pt-1 pb-2">
+                    <input
+                      type="text"
+                      value={newCandidateSkillInput}
+                      onChange={(e) => setNewCandidateSkillInput(e.target.value)}
+                      placeholder="Type skill (e.g. OpenText, Redis)..."
+                      className="flex-1 bg-slate-900 border border-indigo-500/50 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCandidateInput(false)}
+                      className="px-2 py-1 text-slate-400 hover:text-slate-200 text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                )}
+
                 <div className="flex flex-wrap gap-2">
-                  {(candidateProfile.skills || []).map((skill, i) => (
-                    <span key={i} className="px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
-                      {skill}
+                  {editableCandidateSkills.map((skill, i) => (
+                    <span
+                      key={i}
+                      className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs font-semibold"
+                    >
+                      <span>{skill}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCandidateSkill(skill)}
+                        className="text-indigo-400 hover:text-rose-400 transition"
+                        title={`Remove ${skill}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
                   ))}
+                  {editableCandidateSkills.length === 0 && (
+                    <span className="text-xs text-slate-500 italic">No candidate skills listed.</span>
+                  )}
                 </div>
+
                 <div className="pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-400">
                   <span>Est. Experience:</span>
                   <span className="font-bold text-white">
@@ -496,18 +690,68 @@ const minimumStudyWeeks =
 
               {/* Skills breakdown bars */}
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <BarChart2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Skills Breakdown
-                </h4>
-                <div className="space-y-2.5">
-                  {allRequiredSkills.slice(0, 6).map((skill) => {
-                    const has = matchingSet.has(skill);
-                    const pct = has ? 85 : 15;
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <BarChart2 className="w-3.5 h-3.5 text-emerald-400" />
+                    Target Requirements ({filteredRequiredSkills.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRequiredInput(prev => !prev)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Requirement</span>
+                  </button>
+                </div>
+
+                {showAddRequiredInput && (
+                  <form onSubmit={handleAddRequiredSkill} className="flex gap-2 pt-1 pb-2">
+                    <input
+                      type="text"
+                      value={newRequiredSkillInput}
+                      onChange={(e) => setNewRequiredSkillInput(e.target.value)}
+                      placeholder="Type required skill (e.g. SAP ILM, Docker)..."
+                      className="flex-1 bg-slate-900 border border-emerald-500/50 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddRequiredInput(false)}
+                      className="px-2 py-1 text-slate-400 hover:text-slate-200 text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                )}
+
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                  {filteredRequiredSkills.map((skill) => {
+                    const has = matchingSet.has(skill.toLowerCase());
+                    const pct = has ? 90 : 15;
                     return (
-                      <div key={skill}>
+                      <div key={skill} className="group">
                         <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-slate-300">{skill}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-300 font-medium">{skill}</span>
+                            {isSoftSkill(skill) && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">Soft</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRequiredSkill(skill)}
+                              className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-rose-400 transition"
+                              title={`Remove requirement ${skill}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
                           <span className={`text-[10px] font-semibold ${has ? 'text-emerald-400' : 'text-amber-400'}`}>
                             {has ? 'Proficient' : 'Gap'}
                           </span>
@@ -521,6 +765,9 @@ const minimumStudyWeeks =
                       </div>
                     );
                   })}
+                  {filteredRequiredSkills.length === 0 && (
+                    <span className="text-xs text-slate-500 italic">No skills match the current filter.</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -530,25 +777,28 @@ const minimumStudyWeeks =
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-emerald-400 flex items-center gap-1.5 mb-2">
                   <CheckCircle className="w-4 h-4" />
-                  Matching Requirements ({deltaAnalysis.matchingSkills?.length || 0})
+                  Matching Requirements ({effectiveMatchingSkills.length})
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {(deltaAnalysis.matchingSkills || []).map((skill, i) => (
+                  {effectiveMatchingSkills.map((skill, i) => (
                     <span key={i} className="px-2.5 py-1 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-mono">
                       {skill}
                     </span>
                   ))}
+                  {effectiveMatchingSkills.length === 0 && (
+                    <span className="text-slate-500 italic">None matched yet.</span>
+                  )}
                 </div>
               </div>
 
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="font-bold text-amber-400 flex items-center gap-1.5 mb-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Identified Skill Gaps ({deltaAnalysis.missingSkills?.length || 0})
+                  Identified Skill Gaps ({effectiveMissingSkills.length})
                 </span>
-                {(deltaAnalysis.missingSkills || []).length > 0 ? (
+                {effectiveMissingSkills.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {deltaAnalysis.missingSkills.map((skill, i) => (
+                    {effectiveMissingSkills.map((skill, i) => (
                       <button
                         key={i}
                         type="button"
