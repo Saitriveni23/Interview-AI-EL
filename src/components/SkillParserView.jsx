@@ -27,10 +27,16 @@ import {
   Printer,
   Plus,
   X,
-  Filter
+  Filter,
+  Scale,
+  ArrowRight,
+  CheckCheck
 } from 'lucide-react';
 import { getStudyMaterialForSkill, getStudyMaterialsForSkills } from '../data/studyMaterials.js';
-import { isSoftSkill } from '../services/skillExtractor.js';
+import { isSoftSkill, SkillExtractor } from '../services/skillExtractor.js';
+import { TOP_COMPANIES, POPULAR_ROLES, getPresetJobDescription } from '../data/companyRolePresets.js';
+
+const clientComparator = new SkillExtractor();
 
 // ── Circular progress ring ──
 function RingProgress({ pct = 0, size = 96, stroke = 8, color = '#6366f1' }) {
@@ -107,6 +113,16 @@ export default function SkillParserView({
   const [showAddCandidateInput, setShowAddCandidateInput] = useState(false);
   const [showAddRequiredInput, setShowAddRequiredInput] = useState(false);
   const [skillCategoryFilter, setSkillCategoryFilter] = useState('all'); // 'all' | 'technical' | 'soft'
+
+  // ── Multi-Job Comparison (Job A vs Job B) State ──
+  const [compareCompanyB, setCompareCompanyB] = useState('Amazon');
+  const [compareRoleB, setCompareRoleB] = useState('Backend Software Engineer');
+  const [customRoleB, setCustomRoleB] = useState('');
+  const [customCompanyB, setCustomCompanyB] = useState('');
+  const [compareJDB, setCompareJDB] = useState(() =>
+    getPresetJobDescription('Amazon', 'Backend Software Engineer', 'Mid-Level (3-5 yrs)')
+  );
+  const [isCustomJDB, setIsCustomJDB] = useState(false);
 
   // Sync state if props change
   useEffect(() => {
@@ -463,6 +479,33 @@ const minimumStudyWeeks =
   const matchingSet = new Set(effectiveMatchingSkills.map(s => s.toLowerCase()));
   const requiredLevel = getRequiredLevel(effectiveLevel);
 
+  // ── Multi-Job Comparison Calculations (Job A vs Job B) ──
+  const effectiveRoleB = compareRoleB === 'Custom Role' ? (customRoleB.trim() || 'Custom Role') : compareRoleB;
+  const effectiveCompanyB = compareCompanyB === 'Custom Company' ? (customCompanyB.trim() || 'Target Company') : compareCompanyB;
+
+  useEffect(() => {
+    if (!isCustomJDB) {
+      setCompareJDB(getPresetJobDescription(effectiveCompanyB, effectiveRoleB, effectiveLevel || 'Mid-Level (3-5 yrs)'));
+    }
+  }, [compareCompanyB, compareRoleB, customRoleB, customCompanyB, effectiveLevel, isCustomJDB]);
+
+  const deltaB = React.useMemo(() => {
+    return clientComparator.calculateDelta(editableCandidateSkills, compareJDB);
+  }, [editableCandidateSkills, compareJDB]);
+
+  const matchPctB = deltaB.matchPercentage ?? 0;
+  const scoreDifference = matchPctB - matchPct;
+
+  const setMatchingA = new Set(effectiveMatchingSkills.map(s => s.toLowerCase()));
+  const setMatchingB = new Set((deltaB.matchingSkills || []).map(s => s.toLowerCase()));
+  const sharedMatchingSkills = (deltaB.matchingSkills || []).filter(s => setMatchingA.has(s.toLowerCase()));
+
+  const setMissingB = new Set((deltaB.missingSkills || []).map(s => s.toLowerCase()));
+  const setMissingA = new Set(effectiveMissingSkills.map(s => s.toLowerCase()));
+  const uniqueGapsJobA = effectiveMissingSkills.filter(s => !setMissingB.has(s.toLowerCase()));
+  const uniqueGapsJobB = (deltaB.missingSkills || []).filter(s => !setMissingA.has(s.toLowerCase()));
+  const sharedGaps = effectiveMissingSkills.filter(s => setMissingB.has(s.toLowerCase()));
+
   return (
     <div className="space-y-6">
 
@@ -477,7 +520,8 @@ const minimumStudyWeeks =
             {[
               { id: 'analysis', label: 'Skills Analysis', icon: Award },
               { id: 'gaps',     label: 'Gap Analysis',    icon: BarChart2 },
-              { id: 'plan',     label: 'Documentation Plan', icon: BookMarked }
+              { id: 'plan',     label: 'Documentation Plan', icon: BookMarked },
+              { id: 'compare',  label: 'Role Comparison (Job A vs B)', icon: Scale }
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -1386,6 +1430,323 @@ const minimumStudyWeeks =
                 <p className="text-sm">Click "Generate Personalized Study Plan" above to create your roadmap.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─────── TAB: Role Comparison (Job A vs Job B) ─────── */}
+        {mainTab === 'compare' && (
+          <div className="p-6 space-y-6">
+            {/* Header banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-indigo-400" />
+                  Side-by-Side Target Role Comparison
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Benchmark your current profile against two target roles simultaneously to see where you have the highest probability of hiring success.
+                </p>
+              </div>
+              <span className="text-xs text-slate-400 font-mono bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg self-start sm:self-auto">
+                Comparing 2 Target Benchmarks
+              </span>
+            </div>
+
+            {/* Selector for Benchmark Target B */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+                  <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
+                  Configure Benchmark Job Target B
+                </h4>
+                <span className="text-[11px] text-slate-400 italic">
+                  *Changes recalculate comparison instantly (No LLM needed)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Target Company B
+                  </label>
+                  <select
+                    value={compareCompanyB}
+                    onChange={(e) => {
+                      setCompareCompanyB(e.target.value);
+                      setIsCustomJDB(false);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    {TOP_COMPANIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  {compareCompanyB === 'Custom Company' && (
+                    <input
+                      type="text"
+                      value={customCompanyB}
+                      onChange={(e) => setCustomCompanyB(e.target.value)}
+                      placeholder="Type custom company name..."
+                      className="mt-2 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Target Role B
+                  </label>
+                  <select
+                    value={compareRoleB}
+                    onChange={(e) => {
+                      setCompareRoleB(e.target.value);
+                      setIsCustomJDB(false);
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    {POPULAR_ROLES.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  {compareRoleB === 'Custom Role' && (
+                    <input
+                      type="text"
+                      value={customRoleB}
+                      onChange={(e) => setCustomRoleB(e.target.value)}
+                      placeholder="Type custom role title..."
+                      className="mt-2 w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendation Banner */}
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+              scoreDifference > 0
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                : scoreDifference < 0
+                ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-300'
+                : 'bg-slate-900 border-slate-700 text-slate-300'
+            }`}>
+              <div className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCheck className="w-4 h-4" />
+                  Mathematical Hiring Fit Verdict
+                </span>
+                <p className="text-sm font-medium">
+                  {scoreDifference > 0 ? (
+                    <span>
+                      You have a <strong className="text-emerald-400 font-bold">+{scoreDifference}% higher match</strong> for <strong className="text-white">{effectiveRoleB}</strong> at <strong className="text-white">{effectiveCompanyB}</strong> ({matchPctB}% vs {matchPct}%). You only have {deltaB.missingSkills?.length || 0} gaps compared to {effectiveMissingSkills.length} for Job A.
+                    </span>
+                  ) : scoreDifference < 0 ? (
+                    <span>
+                      You have a <strong className="text-indigo-400 font-bold">+{Math.abs(scoreDifference)}% higher match</strong> for your primary target <strong className="text-white">{effectiveRole}</strong> at <strong className="text-white">{effectiveCompany}</strong> ({matchPct}% vs {matchPctB}%).
+                    </span>
+                  ) : (
+                    <span>
+                      Both roles have an <strong className="text-white font-bold">identical match score of {matchPct}%</strong>. Your decision comes down to team culture and domain preference!
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Side-by-Side Job Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {/* Job Target A Card */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                      Primary Target (Job A)
+                    </span>
+                    <h4 className="text-base font-bold text-white mt-1.5">
+                      {effectiveRole} <span className="text-slate-400 font-normal">at</span> {effectiveCompany}
+                    </h4>
+                  </div>
+                  <RingProgress
+                    pct={matchPct}
+                    size={72}
+                    stroke={7}
+                    color={matchPct >= 70 ? '#10b981' : matchPct >= 40 ? '#6366f1' : '#f59e0b'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
+                    <span className="block text-[10px] uppercase text-slate-400 font-semibold">Matched Skills</span>
+                    <span className="text-base font-bold text-emerald-400 font-mono">{effectiveMatchingSkills.length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
+                    <span className="block text-[10px] uppercase text-slate-400 font-semibold">Skill Gaps</span>
+                    <span className="text-base font-bold text-amber-400 font-mono">{effectiveMissingSkills.length}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Required Skills ({editableRequiredSkills.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {editableRequiredSkills.map((s, i) => {
+                      const has = matchingSet.has(s.toLowerCase());
+                      return (
+                        <span
+                          key={i}
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono border ${
+                            has
+                              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                              : 'bg-amber-950/30 border-amber-500/30 text-amber-300'
+                          }`}
+                        >
+                          {s}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Job Target B Card */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                      Benchmark Target (Job B)
+                    </span>
+                    <h4 className="text-base font-bold text-white mt-1.5">
+                      {effectiveRoleB} <span className="text-slate-400 font-normal">at</span> {effectiveCompanyB}
+                    </h4>
+                  </div>
+                  <RingProgress
+                    pct={matchPctB}
+                    size={72}
+                    stroke={7}
+                    color={matchPctB >= 70 ? '#10b981' : matchPctB >= 40 ? '#10b981' : '#f59e0b'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
+                    <span className="block text-[10px] uppercase text-slate-400 font-semibold">Matched Skills</span>
+                    <span className="text-base font-bold text-emerald-400 font-mono">{(deltaB.matchingSkills || []).length}</span>
+                  </div>
+                  <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-800">
+                    <span className="block text-[10px] uppercase text-slate-400 font-semibold">Skill Gaps</span>
+                    <span className="text-base font-bold text-amber-400 font-mono">{(deltaB.missingSkills || []).length}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Required Skills ({(deltaB.requiredSkills || []).length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {(deltaB.requiredSkills || []).map((s, i) => {
+                      const has = (deltaB.matchingSkills || []).some(m => m.toLowerCase() === s.toLowerCase());
+                      return (
+                        <span
+                          key={i}
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono border ${
+                            has
+                              ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                              : 'bg-amber-950/30 border-amber-500/30 text-amber-300'
+                          }`}
+                        >
+                          {s}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Overlap & Differential Analysis Matrix */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-indigo-400" />
+                Cross-Role Skill Overlap & Strategic ROI Matrix
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {/* Shared Strengths */}
+                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Shared Strengths ({sharedMatchingSkills.length})
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Skills you have that satisfy <strong>both</strong> Job A and Job B:
+                  </p>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {sharedMatchingSkills.map((s, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded bg-emerald-950/50 text-emerald-300 font-mono text-[11px] border border-emerald-500/20">
+                        {s}
+                      </span>
+                    ))}
+                    {sharedMatchingSkills.length === 0 && (
+                      <span className="text-slate-500 italic">None in common.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* High-ROI Shared Gaps */}
+                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                  <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    High-ROI Gaps ({sharedGaps.length})
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Missing for <strong>both roles</strong> — learning these helps you qualify for both!
+                  </p>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {sharedGaps.map((s, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded bg-amber-950/50 text-amber-300 font-mono text-[11px] border border-amber-500/20">
+                        {s}
+                      </span>
+                    ))}
+                    {sharedGaps.length === 0 && (
+                      <span className="text-slate-500 italic">No shared gaps.</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Unique to Job A vs B */}
+                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                  <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5" />
+                    Role-Specific Gaps
+                  </span>
+                  <div className="space-y-1.5 text-[11px]">
+                    <div>
+                      <span className="text-slate-400">Only needed for Job A:</span>
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {uniqueGapsJobA.map((s, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-[10px]">
+                            {s}
+                          </span>
+                        ))}
+                        {uniqueGapsJobA.length === 0 && <span className="text-slate-500 italic">None</span>}
+                      </div>
+                    </div>
+                    <div className="pt-1 border-t border-slate-800">
+                      <span className="text-slate-400">Only needed for Job B:</span>
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {uniqueGapsJobB.map((s, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 font-mono text-[10px]">
+                            {s}
+                          </span>
+                        ))}
+                        {uniqueGapsJobB.length === 0 && <span className="text-slate-500 italic">None</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
