@@ -103,6 +103,7 @@ function UploadPage({
   parseResult,
   isLoading,
   onParse,
+  onReset,
   savedSession,
   onDismissSession,
   onRestoreSession,
@@ -168,48 +169,60 @@ function UploadPage({
         {parseResult && (
           <div className="space-y-6">
             {/* Tab bar */}
-            <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
-              <button
-                onClick={() => setActiveResultTab('redaction')}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeResultTab === 'redaction'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
-                }`}
-              >
-                <ShieldAlert className="w-4 h-4" />
-                <span>Privacy Shield</span>
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-indigo-300 text-[10px]">
-                  {parseResult.stats?.totalRedactions ?? 0} Redacted
-                </span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setActiveResultTab('redaction')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeResultTab === 'redaction'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>Privacy Shield</span>
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-indigo-300 text-[10px]">
+                    {parseResult.stats?.totalRedactions ?? 0} Redacted
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveResultTab('skills')}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeResultTab === 'skills'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
-                }`}
-              >
-                <Award className="w-4 h-4" />
-                <span>Skills & Gap Analysis</span>
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-emerald-300 text-[10px]">
-                  {parseResult.deltaAnalysis?.matchPercentage ?? 0}% Match
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveResultTab('skills')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeResultTab === 'skills'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <Award className="w-4 h-4" />
+                  <span>Skills & Gap Analysis</span>
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-slate-950 text-emerald-300 text-[10px]">
+                    {parseResult.deltaAnalysis?.matchPercentage ?? 0}% Match
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveResultTab('interview')}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeResultTab === 'interview'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Mock Interview</span>
-              </button>
+                <button
+                  onClick={() => setActiveResultTab('interview')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeResultTab === 'interview'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Mock Interview</span>
+                </button>
+              </div>
+
+              {onReset && (
+                <button
+                  onClick={onReset}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
+                  title="Clear current analysis and upload a new resume or paste a new job description"
+                >
+                  <span>🔄 Analyze Another Job / Resume</span>
+                </button>
+              )}
             </div>
 
             {/* Tab content */}
@@ -514,6 +527,11 @@ export default function App() {
             parseResult={parseResult}
             isLoading={isLoading}
             onParse={handleParseResume}
+            onReset={() => {
+              setParseResult(null);
+              setSavedSession(null);
+              try { localStorage.removeItem('interview-ai-session'); } catch (_) {}
+            }}
             savedSession={savedSession}
             onDismissSession={handleDismissSession}
             onRestoreSession={handleRestoreSession}

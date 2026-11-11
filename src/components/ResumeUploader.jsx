@@ -101,13 +101,17 @@ export default function ResumeUploader({ onParse, isLoading }) {
   const [jobDescription, setJobDescription] = useState(() =>
     getPresetJobDescription('Google', 'Full Stack Developer', 'Mid-Level (3-5 yrs)')
   );
+  const [isCustomJD, setIsCustomJD] = useState(false);
 
   // Sync Job Description when company, role, or seniority changes
+  // Only auto-populate if the user has NOT provided a custom or imported LinkedIn description!
   useEffect(() => {
-    setJobDescription(
-      getPresetJobDescription(effectiveCompany, effectiveRole, experienceLevel)
-    );
-  }, [companySelect, customCompany, roleSelect, customRole, experienceLevel]);
+    if (!isCustomJD) {
+      setJobDescription(
+        getPresetJobDescription(effectiveCompany, effectiveRole, experienceLevel)
+      );
+    }
+  }, [companySelect, customCompany, roleSelect, customRole, experienceLevel, isCustomJD]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -126,6 +130,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
     setJobDescription(
       getPresetJobDescription('Google', 'Full Stack Developer', 'Mid-Level (3-5 yrs)')
     );
+    setIsCustomJD(false);
   };
 
   // Helper: infer role-based technical skills from job title (mirrors backend logic)
@@ -177,6 +182,8 @@ export default function ResumeUploader({ onParse, isLoading }) {
       `Technical Requirements: ${skillKeywords}`;
 
     setJobDescription(enrichedDesc);
+    setIsCustomJD(true);
+    setShowCustomJD(true);
     setLinkedInModalOpen(false);
   };
 
@@ -474,16 +481,23 @@ export default function ResumeUploader({ onParse, isLoading }) {
             {showCustomJD && (
               <div className="mt-3 space-y-1.5">
                 <div className="flex justify-between items-center text-[11px] text-slate-400">
-                  <span>
-                    Auto-populated requirements for {effectiveRole} at {effectiveCompany}:
+                  <span className="flex items-center gap-1.5">
+                    {isCustomJD ? (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
+                        ✓ Custom / Imported Job Active
+                      </span>
+                    ) : (
+                      <span>Auto-populated requirements for {effectiveRole} at {effectiveCompany}:</span>
+                    )}
                   </span>
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      setIsCustomJD(false);
                       setJobDescription(
                         getPresetJobDescription(effectiveCompany, effectiveRole, experienceLevel)
-                      )
-                    }
+                      );
+                    }}
                     className="text-indigo-400 hover:underline"
                   >
                     Reset to Default Preset
@@ -492,7 +506,10 @@ export default function ResumeUploader({ onParse, isLoading }) {
                 <textarea
                   rows={4}
                   value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
+                  onChange={(e) => {
+                    setJobDescription(e.target.value);
+                    setIsCustomJD(true);
+                  }}
                   placeholder="Paste target job requirements and tech stack here..."
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
