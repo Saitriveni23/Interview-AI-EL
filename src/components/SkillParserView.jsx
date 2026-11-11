@@ -242,6 +242,22 @@ const minimumStudyWeeks =
 
   const displayedPlan = generatedPlan || studyPlan;
 
+  // Calculate total interactive lab checklist tasks across the roadmap
+  const allModules = displayedPlan?.recommendedModules || [];
+  let totalTasksCount = 0;
+  allModules.forEach((m) => {
+    const mat = m.studyMaterial || getStudyMaterialForSkill(m.topic);
+    totalTasksCount += (mat?.handsOnLab?.tasks?.length || 0);
+  });
+  if (totalTasksCount === 0) totalTasksCount = 8; // fallback baseline
+
+  const completedTasksCount = Object.values(completedTasks).filter(Boolean).length;
+  const progressPercentage = Math.min(100, Math.round((completedTasksCount / totalTasksCount) * 100));
+  // Boost projected readiness towards 98% as candidate completes practical tasks
+  const remainingGap = Math.max(0, 98 - (matchPct || 70));
+  const taskBoostPct = Math.round((progressPercentage / 100) * remainingGap);
+  const projectedReadiness = Math.min(100, (matchPct || 70) + taskBoostPct);
+
   const effectiveCompany =
     targetInfo?.company ||
     displayedPlan?.targetCompany ||
@@ -1096,6 +1112,32 @@ const minimumStudyWeeks =
                       <Layers className="w-3.5 h-3.5" />
                       Curated Material Hub ({displayedSkillMaterials.length})
                     </button>
+                  </div>
+                </div>
+
+                {/* ── Dynamic Preparation Progress Tracker ── */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      <span className="font-bold text-white">Roadmap Completion & Practice Progress:</span>
+                      <span className="text-slate-400 font-mono">
+                        {completedTasksCount} of {totalTasksCount} hands-on tasks completed
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="text-slate-400">Projected Readiness:</span>
+                      <strong className="text-emerald-400 text-sm">{projectedReadiness}%</strong>
+                      <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 font-semibold">
+                        +{taskBoostPct}% Boost
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800/80">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500 rounded-full"
+                      style={{ width: `${progressPercentage}%` }}
+                    />
                   </div>
                 </div>
 
