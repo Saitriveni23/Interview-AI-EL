@@ -56,17 +56,26 @@ B.S. in Computer Science | Oregon State University (Graduated 2019)
 Certifications: AWS Certified Developer (2022)`;
 
 export default function ResumeUploader({ onParse, isLoading }) {
-  const [activeTab, setActiveTab] = useState('upload'); // 'upload' | 'text'
+  // Restore draft from sessionStorage if available to prevent input loss
+  const getDraft = () => {
+    try {
+      const raw = sessionStorage.getItem('interview-ai-uploader-draft');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  };
+  const draft = getDraft();
+
+  const [activeTab, setActiveTab] = useState(draft?.activeTab || 'upload'); // 'upload' | 'text'
   const [file, setFile] = useState(null);
-  const [resumeText, setResumeText] = useState('');
+  const [resumeText, setResumeText] = useState(draft?.resumeText || '');
 
   // Target Interview Details
-  const [companySelect, setCompanySelect] = useState('Google');
-  const [customCompany, setCustomCompany] = useState('');
-  const [roleSelect, setRoleSelect] = useState('Full Stack Developer');
-  const [customRole, setCustomRole] = useState('');
-  const [experienceLevel, setExperienceLevel] = useState('Mid-Level (3-5 yrs)');
-  const [showCustomJD, setShowCustomJD] = useState(false);
+  const [companySelect, setCompanySelect] = useState(draft?.companySelect || 'Google');
+  const [customCompany, setCustomCompany] = useState(draft?.customCompany || '');
+  const [roleSelect, setRoleSelect] = useState(draft?.roleSelect || 'Full Stack Developer');
+  const [customRole, setCustomRole] = useState(draft?.customRole || '');
+  const [experienceLevel, setExperienceLevel] = useState(draft?.experienceLevel || 'Mid-Level (3-5 yrs)');
+  const [showCustomJD, setShowCustomJD] = useState(draft?.showCustomJD || false);
 
   // LinkedIn Recruitment Import States
   const [linkedInModalOpen, setLinkedInModalOpen] = useState(false);
@@ -100,10 +109,40 @@ export default function ResumeUploader({ onParse, isLoading }) {
       ? customRole.trim() || 'Software Engineer'
       : roleSelect;
 
-  const [jobDescription, setJobDescription] = useState(() =>
-    getPresetJobDescription('Google', 'Full Stack Developer', 'Mid-Level (3-5 yrs)')
-  );
-  const [isCustomJD, setIsCustomJD] = useState(false);
+  const [jobDescription, setJobDescription] = useState(() => {
+    if (draft?.jobDescription) return draft.jobDescription;
+    return getPresetJobDescription('Google', 'Full Stack Developer', 'Mid-Level (3-5 yrs)');
+  });
+  const [isCustomJD, setIsCustomJD] = useState(draft?.isCustomJD || false);
+
+  // Auto-save form inputs to sessionStorage so no progress is lost on reload or tab switch
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('interview-ai-uploader-draft', JSON.stringify({
+        activeTab,
+        resumeText,
+        companySelect,
+        customCompany,
+        roleSelect,
+        customRole,
+        experienceLevel,
+        jobDescription,
+        isCustomJD,
+        showCustomJD
+      }));
+    } catch (_) {}
+  }, [
+    activeTab,
+    resumeText,
+    companySelect,
+    customCompany,
+    roleSelect,
+    customRole,
+    experienceLevel,
+    jobDescription,
+    isCustomJD,
+    showCustomJD
+  ]);
 
   // Sync Job Description when company, role, or seniority changes
   // Only auto-populate if the user has NOT provided a custom or imported LinkedIn description!
@@ -120,6 +159,41 @@ export default function ResumeUploader({ onParse, isLoading }) {
     if (!jobDescription || !jobDescription.trim()) return [];
     return clientSkillExtractor.detectSkills(jobDescription);
   }, [jobDescription]);
+
+  const handleJDFileUpload = async (e) => {
+    const jdFile = e.target.files && e.target.files[0];
+    if (!jdFile) return;
+
+    if (jdFile.name.endsWith('.txt')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target.result || '';
+        if (text.trim()) {
+          setJobDescription(text);
+          setIsCustomJD(true);
+          setShowCustomJD(true);
+        }
+      };
+      reader.readAsText(jdFile);
+    } else {
+      // PDF or binary text stream extraction
+      try {
+        const arrayBuffer = await jdFile.arrayBuffer();
+        const textDecoder = new TextDecoder('utf-8', { fatal: false });
+        const decoded = textDecoder.decode(arrayBuffer);
+        const extracted = decoded.match(/[\x20-\x7E\t\r\n]{4,}/g)?.join(' ') || '';
+        if (extracted.length > 30) {
+          setJobDescription(extracted);
+          setIsCustomJD(true);
+          setShowCustomJD(true);
+        } else {
+          alert('Could not extract text from this file. Please paste the job text directly.');
+        }
+      } catch (err) {
+        alert('Failed to read file: ' + err.message);
+      }
+    }
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -488,7 +562,7 @@ export default function ResumeUploader({ onParse, isLoading }) {
 
             {showCustomJD && (
               <div className="mt-3 space-y-1.5">
-                <div className="flex justify-between items-center text-[11px] text-slate-400">
+                <div className="flex flex-wrap justify-between items-center gap-2 text-[11px] text-slate-400">
                   <span className="flex items-center gap-1.5">
                     {isCustomJD ? (
                       <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
@@ -498,18 +572,30 @@ export default function ResumeUploader({ onParse, isLoading }) {
                       <span>Auto-populated requirements for {effectiveRole} at {effectiveCompany}:</span>
                     )}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomJD(false);
-                      setJobDescription(
-                        getPresetJobDescription(effectiveCompany, effectiveRole, experienceLevel)
-                      );
-                    }}
-                    className="text-indigo-400 hover:underline"
-                  >
-                    Reset to Default Preset
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <label className="text-indigo-400 hover:text-indigo-300 cursor-pointer flex items-center gap-1 font-medium">
+                      <span>📎 Upload JD File (.pdf, .txt)</span>
+                      <input
+                        type="file"
+                        accept=".txt,.pdf"
+                        onChange={handleJDFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomJD(false);
+                        setJobDescription(
+                          getPresetJobDescription(effectiveCompany, effectiveRole, experienceLevel)
+                        );
+                      }}
+                      className="text-slate-400 hover:text-rose-400 transition"
+                      title="Reset back to standard company/role preset"
+                    >
+                      Reset to Default
+                    </button>
+                  </div>
                 </div>
                 <textarea
                   rows={4}
