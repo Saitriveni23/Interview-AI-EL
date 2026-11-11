@@ -107,7 +107,13 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
     }
   }
 
-  const cleanText = (rawText || '').trim();
+  // Normalize weird Unicode bullets and non-standard spacing into clean standard dashes
+  let sanitized = (rawText || '')
+    .replace(/[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25BA\u2714\u2713\u25CB\u25CF\u25A0\u25A1]/g, '\n- ')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ');
+
+  const cleanText = sanitized.trim();
   const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);
 
   let title = 'Software Engineer';
@@ -115,8 +121,12 @@ export function parseLinkedInJob(rawText, sourceUrl = '') {
   let location = 'Remote / Hybrid';
   let experienceLevel = 'Mid-Level';
 
-  // Strip common LinkedIn page chrome that isn't part of the job post
-  const skipPrefixes = ['about the job', 'show more', 'show less', 'apply', 'save', 'report'];
+  // Strip common LinkedIn/portal chrome that isn't part of the job post
+  const skipPrefixes = [
+    'about the job', 'show more', 'show less', 'apply', 'apply now', 'save',
+    'report', 'report job', 'posted', 'posted 30+ days ago', 'easy apply',
+    'job description', 'full job description', 'overview'
+  ];
   const contentLines = lines.filter(l => !skipPrefixes.includes(l.toLowerCase()));
 
   const atMatch = contentLines[0]?.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*[-–|]|\s*$)/i);

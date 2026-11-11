@@ -15,7 +15,9 @@ import {
   Cpu,
   Wifi,
   WifiOff,
-  Globe
+  Globe,
+  Target,
+  CheckCircle
 } from 'lucide-react';
 import {
   TOP_COMPANIES,
@@ -112,6 +114,12 @@ export default function ResumeUploader({ onParse, isLoading }) {
       );
     }
   }, [companySelect, customCompany, roleSelect, customRole, experienceLevel, isCustomJD]);
+
+  // Live Pre-Analysis Preview of skills extracted from current job description
+  const previewSkills = React.useMemo(() => {
+    if (!jobDescription || !jobDescription.trim()) return [];
+    return clientSkillExtractor.detectSkills(jobDescription);
+  }, [jobDescription]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -645,6 +653,53 @@ export default function ResumeUploader({ onParse, isLoading }) {
               />
             </div>
           )}
+        </div>
+
+        {/* ================= LIVE PRE-ANALYSIS CONFIRMATION CARD ================= */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold text-white">
+                Live Assessment Target: <span className="text-indigo-400">{effectiveRole}</span> <span className="text-slate-400 font-normal">at</span> <span className="text-white">{effectiveCompany}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {isCustomJD ? (
+                <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
+                  ✓ Custom / Imported Job Locked In
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-medium text-[10px]">
+                  Standard Preset
+                </span>
+              )}
+              <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">
+                {previewSkills.length} Requirements Detected
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {previewSkills.slice(0, 16).map((skill, i) => (
+              <span
+                key={i}
+                className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 text-[11px] font-mono"
+              >
+                {skill}
+              </span>
+            ))}
+            {previewSkills.length > 16 && (
+              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[11px]">
+                +{previewSkills.length - 16} more
+              </span>
+            )}
+            {previewSkills.length === 0 && (
+              <span className="text-xs text-amber-400 italic">
+                No technical skills detected yet. Type in or paste requirements in the editor above.
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Action Button */}
