@@ -6,7 +6,9 @@ const VALID_CATEGORIES = [
   'Technical',
   'Behavioral',
   'Situational',
-  'Resume-Based'
+  'Resume-Based',
+  'System Design',
+  'HR'
 ];
 
 // ==========================================
@@ -432,8 +434,8 @@ export async function evaluateInterview({
   redactedResumeText = '',
   llmService
 }) {
-  if (!Array.isArray(answers) || answers.length !== 7) {
-    throw new Error('Exactly 7 answers are required.');
+  if (!Array.isArray(answers) || answers.length === 0) {
+    throw new Error('Interview answers are required.');
   }
 
   for (const item of answers) {
@@ -680,7 +682,7 @@ try {
 
     if (
       !Array.isArray(result.questionEvaluations) ||
-      result.questionEvaluations.length !== 7
+      result.questionEvaluations.length !== answers.length
     ) {
       throw new Error(
         'Gemini did not return exactly seven evaluations.'

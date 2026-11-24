@@ -7,13 +7,17 @@ import {
   LogOut,
   Zap,
   Clock,
+  ShieldAlert,
+  Brain
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Home', icon: Home },
   { id: 'sessions', label: 'My Sessions', icon: Clock },
   { id: 'upload', label: 'Resume Builder', icon: FileText },
-  { id: 'interview', label: 'Interview Prep', icon: PlayCircle },
+  { id: 'defense', label: 'Resume Defense', icon: ShieldAlert },
+  { id: 'interview', label: 'Adaptive Interview', icon: PlayCircle },
+  { id: 'intelligence', label: 'Intelligence Radar', icon: Brain },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

@@ -9,6 +9,24 @@ import { evaluateInterview } from '../services/interviewEvaluationService.js';
 import { getPresetJobDescription } from '../data/companyRolePresets.js';
 import { parseLinkedInJob } from '../services/linkedInService.js';
 import { User, CandidateSession, LinkedInJob, InterviewEvaluation, isDBConnected } from '../db/mongo.js';
+import {
+  generateAdaptiveQuestion,
+  generateContextualFollowUp,
+  analyzeAnswerQuality,
+  calculateNextDifficulty,
+  INTERVIEW_PERSONALITIES,
+  INTERVIEW_TYPES,
+  DIFFICULTY_LEVELS
+} from '../services/adaptiveInterviewerService.js';
+import {
+  extractResumeClaims,
+  evaluateDefenseResponse,
+  generateResumeDefenseReport
+} from '../services/resumeDefenseService.js';
+import {
+  calculateIntelligenceMetrics,
+  generateTargetedPracticeDrills
+} from '../services/interviewIntelligenceService.js';
 
 const router = Router();
 
@@ -432,11 +450,11 @@ router.post('/evaluate-interview', async (req, res) => {
 
     if (
       !Array.isArray(answers) ||
-      answers.length !== 7
+      answers.length === 0
     ) {
       return res.status(400).json({
         success: false,
-        error: 'Exactly 7 interview answers are required.'
+        error: 'Interview answers are required.'
       });
     }
 
@@ -448,11 +466,13 @@ router.post('/evaluate-interview', async (req, res) => {
         typeof item.answer === 'string' &&
         item.answer.trim() &&
         [
-  'Technical',
-  'Behavioral',
-  'Situational',
-  'Resume-Based'
-].includes(
+          'Technical',
+          'Behavioral',
+          'Situational',
+          'Resume-Based',
+          'System Design',
+          'HR'
+        ].includes(
           item.category
         )
     );
@@ -501,6 +521,150 @@ router.post('/evaluate-interview', async (req, res) => {
       success: false,
       error: 'Unable to evaluate interview answers.'
     });
+  }
+});
+
+// ==========================================
+// 6. ADAPTIVE INTERVIEWER ENDPOINTS
+// ==========================================
+
+router.post('/adaptive-question', async (req, res) => {
+  try {
+    const {
+      category = 'Technical',
+      difficulty = 'Intermediate',
+      personality = 'professional',
+      previousQuestion = '',
+      previousAnswer = '',
+      candidateSkills = [],
+      targetInfo = {},
+      usedQuestions = []
+    } = req.body;
+
+    const result = await generateAdaptiveQuestion({
+      category,
+      currentDifficulty: difficulty,
+      personality,
+      previousQuestion,
+      previousAnswer,
+      candidateSkills,
+      targetInfo,
+      usedQuestions
+    });
+
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Adaptive question generation error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to generate adaptive question' });
+  }
+});
+
+router.post('/adaptive-followup', async (req, res) => {
+  try {
+    const {
+      question = '',
+      answer = '',
+      personality = 'professional',
+      category = 'Technical'
+    } = req.body;
+
+    const followUp = await generateContextualFollowUp({
+      question,
+      answer,
+      personality,
+      category
+    });
+
+    const analysis = analyzeAnswerQuality(answer, question);
+    const nextDifficulty = calculateNextDifficulty('Intermediate', analysis.quality);
+
+    return res.json({
+      success: true,
+      followUp,
+      analysis,
+      nextDifficulty
+    });
+  } catch (error) {
+    console.error('Follow-up generation error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to generate follow-up question' });
+  }
+});
+
+// ==========================================
+// 7. RESUME DEFENSE & CROSS-EXAMINATION
+// ==========================================
+
+router.post('/extract-claims', async (req, res) => {
+  try {
+    const { resumeText = '' } = req.body;
+    const claims = extractResumeClaims(resumeText);
+    return res.json({ success: true, claims });
+  } catch (error) {
+    console.error('Resume claims extraction error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to extract resume claims' });
+  }
+});
+
+router.post('/defend-claim', async (req, res) => {
+  try {
+    const {
+      claimText = '',
+      challengeText = '',
+      defenseText = '',
+      targetRole = 'Software Engineer'
+    } = req.body;
+
+    const evaluation = await evaluateDefenseResponse({
+      claimText,
+      challengeText,
+      defenseText,
+      targetRole
+    });
+
+    return res.json({ success: true, evaluation });
+  } catch (error) {
+    console.error('Claim defense evaluation error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to evaluate defense' });
+  }
+});
+
+router.post('/defense-report', (req, res) => {
+  try {
+    const { claims = [], targetInfo = {} } = req.body;
+    const report = generateResumeDefenseReport(claims, targetInfo);
+    return res.json({ success: true, report });
+  } catch (error) {
+    console.error('Defense report error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to generate defense report' });
+  }
+});
+
+// ==========================================
+// 8. INTERVIEW INTELLIGENCE DASHBOARD
+// ==========================================
+
+router.post('/intelligence-metrics', (req, res) => {
+  try {
+    const {
+      sessions = [],
+      interviewEvaluations = [],
+      resumeDefenseReport = null,
+      deltaAnalysis = null
+    } = req.body;
+
+    const metrics = calculateIntelligenceMetrics({
+      sessions,
+      interviewEvaluations,
+      resumeDefenseReport,
+      deltaAnalysis
+    });
+
+    const drills = generateTargetedPracticeDrills(metrics);
+
+    return res.json({ success: true, metrics, drills });
+  } catch (error) {
+    console.error('Intelligence metrics calculation error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to calculate intelligence metrics' });
   }
 });
 

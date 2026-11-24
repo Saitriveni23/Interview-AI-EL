@@ -6,9 +6,11 @@ import ResumeUploader from './components/ResumeUploader';
 import RedactionViewer from './components/RedactionViewer';
 import SkillParserView from './components/SkillParserView';
 import InterviewPanel from './components/InterviewPanel';
+import ResumeDefenseView from './components/ResumeDefenseView';
+import IntelligenceDashboard from './components/IntelligenceDashboard';
 import AuthModal from './components/AuthModal';
 import { analyzeResumeClientSide } from './services/clientFallbackService.js';
-import { ShieldAlert, Award, MessageSquare, BookOpen, Plus, ChevronRight } from 'lucide-react';
+import { ShieldAlert, Award, MessageSquare, BookOpen, Plus, ChevronRight, Brain, ShieldCheck } from 'lucide-react';
 
 // ============================================================
 // My Sessions Page (inline — small enough to keep here)
@@ -108,7 +110,11 @@ function UploadPage({
   onDismissSession,
   onRestoreSession,
   activeResultTab,
-  setActiveResultTab
+  setActiveResultTab,
+  defenseReport,
+  onReportGenerated,
+  sessions = [],
+  onStartTargetedPractice
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
@@ -202,6 +208,18 @@ function UploadPage({
                 </button>
 
                 <button
+                  onClick={() => setActiveResultTab('defense')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeResultTab === 'defense'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>Resume Defense</span>
+                </button>
+
+                <button
                   onClick={() => setActiveResultTab('interview')}
                   className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
                     activeResultTab === 'interview'
@@ -210,7 +228,19 @@ function UploadPage({
                   }`}
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>Mock Interview</span>
+                  <span>Adaptive Mock Interview</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveResultTab('intelligence')}
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+                    activeResultTab === 'intelligence'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800'
+                  }`}
+                >
+                  <Brain className="w-4 h-4 text-purple-400" />
+                  <span>Intelligence Radar</span>
                 </button>
               </div>
 
@@ -240,11 +270,29 @@ function UploadPage({
               />
             )}
 
+            {activeResultTab === 'defense' && (
+              <ResumeDefenseView
+                resumeText={parseResult.redactedText || ''}
+                targetInfo={parseResult.targetInfo}
+                onReportGenerated={onReportGenerated}
+              />
+            )}
+
             {activeResultTab === 'interview' && (
               <InterviewPanel
                 targetInfo={parseResult.targetInfo}
                 candidateSkills={parseResult.candidateProfile?.skills || []}
                 redactedResumeText={parseResult.redactedText || ''}
+              />
+            )}
+
+            {activeResultTab === 'intelligence' && (
+              <IntelligenceDashboard
+                sessions={sessions}
+                interviewEvaluations={[]}
+                resumeDefenseReport={defenseReport}
+                deltaAnalysis={parseResult.deltaAnalysis}
+                onStartTargetedPractice={onStartTargetedPractice}
               />
             )}
           </div>
@@ -257,7 +305,7 @@ function UploadPage({
 // ============================================================
 // Dedicated Interview Prep Page (Screen 5)
 // ============================================================
-function InterviewPage({ parseResult, onNavigate }) {
+function InterviewPage({ parseResult, onNavigate, drillPreset = null }) {
   const targetInfo = parseResult?.targetInfo || { company: 'Google', role: 'Full Stack Developer' };
   const candidateSkills = parseResult?.candidateProfile?.skills || ['JavaScript', 'React', 'Node.js', 'SQL', 'Python'];
   const redactedResumeText = parseResult?.redactedText || '';
@@ -268,9 +316,9 @@ function InterviewPage({ parseResult, onNavigate }) {
         {!parseResult && (
           <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="text-sm">
-              <span className="font-bold text-indigo-300">💡 Standard Benchmark Practice Mode</span>
+              <span className="font-bold text-indigo-300">💡 Adaptive AI Practice Mode</span>
               <p className="text-slate-400 text-xs mt-0.5">
-                Practicing with standard {targetInfo.role} @ {targetInfo.company} interview questions. Upload your resume anytime to generate questions personalized to your actual experience and skill gaps.
+                Practicing with adaptive {targetInfo.role} @ {targetInfo.company} interview questions. Upload your resume anytime to cross-examine claims and generate personal gap analysis.
               </p>
             </div>
             <button
@@ -286,6 +334,7 @@ function InterviewPage({ parseResult, onNavigate }) {
           targetInfo={targetInfo}
           candidateSkills={candidateSkills}
           redactedResumeText={redactedResumeText}
+          drillPreset={drillPreset}
         />
       </div>
     </div>
@@ -300,6 +349,25 @@ export default function App() {
   const [activeResultTab, setActiveResultTab] = useState('redaction');
   const [parseResult, setParseResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [drillPreset, setDrillPreset] = useState(null);
+  const [defenseReport, setDefenseReport] = useState(() => {
+    try {
+      const r = localStorage.getItem('interview-ai-defense-report');
+      return r ? JSON.parse(r) : null;
+    } catch (_) { return null; }
+  });
+
+  const handleDefenseReportGenerated = (rep) => {
+    setDefenseReport(rep);
+    try {
+      localStorage.setItem('interview-ai-defense-report', JSON.stringify(rep));
+    } catch (_) {}
+  };
+
+  const handleStartTargetedPractice = (drill) => {
+    setDrillPreset(drill);
+    setActivePage('interview');
+  };
 
   // Theme state persisted in localStorage
   const [darkMode, setDarkMode] = useState(() => {
@@ -517,7 +585,32 @@ export default function App() {
           <InterviewPage
             parseResult={parseResult}
             onNavigate={handleNavigate}
+            drillPreset={drillPreset}
           />
+        );
+
+      case 'defense':
+        return (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-7xl mx-auto w-full">
+            <ResumeDefenseView
+              resumeText={parseResult?.redactedText || (savedSession?.candidateProfile ? JSON.stringify(savedSession.candidateProfile) : 'Senior Full Stack Engineer. Improved latency by 40% across distributed microservices. Led team of 8 engineers and migrated Postgres to Kafka event streaming.')}
+              targetInfo={parseResult?.targetInfo || { role: 'Full Stack Developer', company: 'Google' }}
+              onReportGenerated={handleDefenseReportGenerated}
+            />
+          </div>
+        );
+
+      case 'intelligence':
+        return (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-7xl mx-auto w-full">
+            <IntelligenceDashboard
+              sessions={sessions}
+              interviewEvaluations={[]}
+              resumeDefenseReport={defenseReport}
+              deltaAnalysis={parseResult?.deltaAnalysis || null}
+              onStartTargetedPractice={handleStartTargetedPractice}
+            />
+          </div>
         );
 
       case 'upload':
@@ -537,6 +630,10 @@ export default function App() {
             onRestoreSession={handleRestoreSession}
             activeResultTab={activeResultTab}
             setActiveResultTab={setActiveResultTab}
+            defenseReport={defenseReport}
+            onReportGenerated={handleDefenseReportGenerated}
+            sessions={sessions}
+            onStartTargetedPractice={handleStartTargetedPractice}
           />
         );
     }

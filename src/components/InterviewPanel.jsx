@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock, Mic, MicOff, Volume2, VolumeX, Sparkles, Printer } from 'lucide-react';
+import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock, Mic, MicOff, Volume2, VolumeX, Sparkles, Printer, ShieldCheck, Zap, Flame, Layers, MessageCircle, HelpCircle } from 'lucide-react';
+import {
+  INTERVIEW_PERSONALITIES,
+  INTERVIEW_TYPES,
+  DIFFICULTY_LEVELS,
+  analyzeAnswerQuality,
+  calculateNextDifficulty,
+  generateContextualFollowUp,
+  generateAdaptiveQuestion
+} from '../services/adaptiveInterviewerService.js';
 
 // ==========================================
 // 1. LOCAL TECHNICAL QUESTION BANK
@@ -424,7 +433,14 @@ function buildDemoEvaluation(answers) {
 // ==========================================
 // MODE SELECTION SCREEN COMPONENT
 // ==========================================
-function ModeSelectionScreen({ targetInfo, onSelectMode }) {
+function ModeSelectionScreen({
+  targetInfo,
+  onSelectMode,
+  selectedPersonality = 'professional',
+  onSelectPersonality,
+  selectedCategory = 'All',
+  onSelectCategory
+}) {
   const modes = [
     {
       id: 'ai-mock',
@@ -468,69 +484,144 @@ function ModeSelectionScreen({ targetInfo, onSelectMode }) {
   ];
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-white">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-white space-y-8">
       {/* Header */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-2">Choose Interview Mode</h2>
+      <div>
+        <h2 className="text-2xl font-bold mb-2">Configure Adaptive AI Interview</h2>
         {targetInfo?.company && (
           <p className="text-slate-400 text-sm">
-            Preparing for <span className="text-indigo-300 font-semibold">{targetInfo.role || 'Software Engineer'}</span> at <span className="text-indigo-300 font-semibold">{targetInfo.company}</span>
+            Simulating interview bar for <span className="text-indigo-300 font-semibold">{targetInfo.role || 'Software Engineer'}</span> at <span className="text-indigo-300 font-semibold">{targetInfo.company}</span>
           </p>
         )}
         {!targetInfo?.company && (
-          <p className="text-slate-400 text-sm">Select the type of interview you want to practice</p>
+          <p className="text-slate-400 text-sm">Select interviewer personality, round focus, and preparation mode</p>
         )}
       </div>
 
-      {/* Mode cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-        {modes.map((mode) => {
-          const Icon = mode.icon;
-          return (
-            <div
-              key={mode.id}
-              className={`relative bg-slate-800/50 border ${mode.borderColor} ${mode.hoverBorder} rounded-2xl p-6 flex flex-col gap-4 transition-all cursor-pointer group`}
-              onClick={() => onSelectMode(mode.id)}
-            >
-              {/* Badge */}
-              <span className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full ${mode.badgeColor}`}>
-                {mode.badge}
-              </span>
+      {/* 1. Interviewer Personality Selector */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <span>Interviewer AI Persona</span>
+            <span className="text-slate-500 font-normal">({Object.keys(INTERVIEW_PERSONALITIES).length} personalities available)</span>
+          </label>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {Object.entries(INTERVIEW_PERSONALITIES).map(([pId, p]) => {
+            const isSelected = selectedPersonality === pId;
+            return (
+              <button
+                key={pId}
+                type="button"
+                onClick={() => onSelectPersonality && onSelectPersonality(pId)}
+                className={`p-3.5 rounded-xl border text-left transition relative flex flex-col justify-between gap-2 ${
+                  isSelected
+                    ? 'bg-indigo-950/80 border-indigo-500 ring-2 ring-indigo-500/30'
+                    : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800 hover:border-slate-600'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs font-bold text-white leading-tight">{p.name.split('&')[0]}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-800 text-indigo-300 border border-slate-700">
+                      {p.badge}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{p.description}</p>
+                </div>
+                {isSelected && (
+                  <div className="flex items-center gap-1 text-[10px] text-indigo-400 font-semibold mt-1">
+                    <CheckCircle className="w-3 h-3" />
+                    <span>Active Persona</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Icon */}
-              <div className={`w-12 h-12 rounded-xl ${mode.iconBg} flex items-center justify-center`}>
-                <Icon className={`w-6 h-6 ${mode.iconColor}`} />
-              </div>
+      {/* 2. Round Category Focus */}
+      <div className="space-y-3">
+        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          Round Focus / Category
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {['All', ...INTERVIEW_TYPES].map((cat) => {
+            const isCatActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => onSelectCategory && onSelectCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition ${
+                  isCatActive
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                {cat === 'All' ? '🎯 Full Comprehensive Mix' : cat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* Content */}
-              <div className="flex-1">
-                <h3 className="font-bold text-white mb-2">{mode.title}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{mode.description}</p>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-700">
-                <span className="text-xs text-slate-500 flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {mode.duration}
+      {/* 3. Mode cards */}
+      <div className="space-y-3">
+        <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+          Choose Practice Mode
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {modes.map((mode) => {
+            const Icon = mode.icon;
+            return (
+              <div
+                key={mode.id}
+                className={`relative bg-slate-800/50 border ${mode.borderColor} ${mode.hoverBorder} rounded-2xl p-6 flex flex-col gap-4 transition-all cursor-pointer group`}
+                onClick={() => onSelectMode(mode.id)}
+              >
+                {/* Badge */}
+                <span className={`absolute top-4 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full ${mode.badgeColor}`}>
+                  {mode.badge}
                 </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onSelectMode(mode.id); }}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-700 group-hover:bg-indigo-600 text-slate-300 group-hover:text-white transition`}
-                >
-                  Select →
-                </button>
+
+                {/* Icon */}
+                <div className={`w-12 h-12 rounded-xl ${mode.iconBg} flex items-center justify-center`}>
+                  <Icon className={`w-6 h-6 ${mode.iconColor}`} />
+                </div>
+
+                {/* Content */}
+                <div className="flex-1">
+                  <h3 className="font-bold text-white mb-2">{mode.title}</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">{mode.description}</p>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-700">
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {mode.duration}
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelectMode(mode.id); }}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-700 group-hover:bg-indigo-600 text-slate-300 group-hover:text-white transition`}
+                  >
+                    Start Interview →
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Tips */}
-      <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 text-sm text-slate-400">
-        <span className="text-indigo-300 font-semibold">💡 Tip: </span>
-        All modes record your answers and provide AI-powered feedback after completion.
-        Make sure your resume has been analyzed first for the best experience.
+      <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 text-sm text-slate-400 flex items-center gap-3">
+        <Sparkles className="w-5 h-5 text-indigo-400 shrink-0" />
+        <p className="text-xs leading-relaxed">
+          <strong className="text-indigo-300">Adaptive AI active:</strong> Your interviewer will evaluate answer depth, dynamically raise or lower difficulty, and generate real-time follow-up challenges to test your technical decisions.
+        </p>
       </div>
     </div>
   );
@@ -752,10 +843,18 @@ function buildIntelligentClientEvaluation(answers, redactedResumeText = '', targ
 export default function InterviewPanel({
   targetInfo,
   candidateSkills = [],
-  redactedResumeText = ""
+  redactedResumeText = "",
+  drillPreset = null
 }) {
   // Mode selection — null means show mode picker
-  const [interviewMode, setInterviewMode] = useState(null);
+  const [interviewMode, setInterviewMode] = useState(drillPreset ? 'ai-mock' : null);
+  const [selectedPersonality, setSelectedPersonality] = useState(drillPreset?.suggestedPersonality || 'professional');
+  const [selectedCategory, setSelectedCategory] = useState(drillPreset?.presetType || 'All');
+  const [currentDifficulty, setCurrentDifficulty] = useState(drillPreset?.difficulty || 'Intermediate');
+
+  const [followUpQuestion, setFollowUpQuestion] = useState(null);
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [followUpAnswer, setFollowUpAnswer] = useState("");
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1009,6 +1108,11 @@ export default function InterviewPanel({
     }
 
     const question = questions[currentQuestion];
+    const quality = analyzeAnswerQuality(answer.trim(), question.question);
+    const nextDiff = calculateNextDifficulty(currentDifficulty, quality.quality);
+    setCurrentDifficulty(nextDiff);
+
+    const finalAnswer = answer.trim() + (followUpAnswer.trim() ? `\n[Follow-Up Defense]: ${followUpAnswer.trim()}` : '');
 
     const updatedAnswers = [
       ...answers,
@@ -1016,16 +1120,20 @@ export default function InterviewPanel({
         questionNumber: currentQuestion + 1,
         category: question.category,
         skill: question.skill,
-        difficulty: question.difficulty,
+        difficulty: currentDifficulty,
         question: question.question,
-        answer: answer.trim(),
+        answer: finalAnswer,
         source: question.source,
-        resumeClaim: question.resumeClaim || ""
+        resumeClaim: question.resumeClaim || "",
+        qualityAnalysis: quality,
+        followUp: followUpQuestion ? { question: followUpQuestion.question, answer: followUpAnswer.trim() } : null
       }
     ];
 
     setAnswers(updatedAnswers);
     setAnswer("");
+    setFollowUpQuestion(null);
+    setFollowUpAnswer("");
 
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
@@ -1129,6 +1237,10 @@ export default function InterviewPanel({
     return (
       <ModeSelectionScreen
         targetInfo={targetInfo}
+        selectedPersonality={selectedPersonality}
+        onSelectPersonality={setSelectedPersonality}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
         onSelectMode={(mode) => {
           setInterviewMode(mode);
         }}
@@ -1223,20 +1335,34 @@ export default function InterviewPanel({
 
           {/* QUESTION CATEGORY */}
 
-          <div className="flex flex-wrap gap-3 mb-5">
-
-            <span className="bg-indigo-950 text-indigo-300 px-3 py-2 rounded-lg text-sm">
+          <div className="flex flex-wrap gap-2.5 mb-5 items-center">
+            <span className="bg-indigo-950 text-indigo-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-500/30">
               {questions[currentQuestion].category}
             </span>
 
-            <span className="bg-slate-800 text-slate-300 px-3 py-2 rounded-lg text-sm">
+            <span className="bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700">
               Skill: {questions[currentQuestion].skill}
             </span>
 
-            <span className="bg-slate-800 text-slate-300 px-3 py-2 rounded-lg text-sm">
-              Difficulty: {questions[currentQuestion].difficulty}
+            {/* Dynamic Difficulty Badge */}
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono border ${
+              currentDifficulty === 'Staff'
+                ? 'bg-purple-950/80 text-purple-300 border-purple-500/40'
+                : currentDifficulty === 'Advanced'
+                  ? 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+                  : currentDifficulty === 'Intermediate'
+                    ? 'bg-blue-950/80 text-blue-300 border-blue-500/40'
+                    : 'bg-slate-800 text-slate-300 border-slate-700'
+            }`}>
+              ⚡ Dynamic Difficulty: {currentDifficulty}
             </span>
 
+            {/* Interviewer Persona Badge */}
+            <span className="bg-slate-800/80 text-indigo-300 px-3 py-1.5 rounded-lg text-xs font-medium border border-indigo-500/20 flex items-center gap-1.5">
+              <span>Persona:</span>
+              <strong className="text-white">{INTERVIEW_PERSONALITIES[selectedPersonality]?.name.split('&')[0]}</strong>
+              <span className="text-[10px] text-slate-400">({INTERVIEW_PERSONALITIES[selectedPersonality]?.badge})</span>
+            </span>
           </div>
 
           {/* QUESTION SOURCE */}
@@ -1324,6 +1450,90 @@ export default function InterviewPanel({
                 isListening ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-slate-700'
               } text-white focus:outline-none focus:border-indigo-500 transition`}
             />
+
+            {/* Live Answer Quality Indicator */}
+            {(() => {
+              if (!answer || answer.trim().length < 8) return null;
+              const quality = analyzeAnswerQuality(answer, questions[currentQuestion]?.question);
+              const qualityConfig = {
+                strong: { bg: 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300', label: 'Strong & Detailed' },
+                vague: { bg: 'bg-amber-950/60 border-amber-500/40 text-amber-300', label: 'Vague / High-Level' },
+                incomplete: { bg: 'bg-orange-950/60 border-orange-500/40 text-orange-300', label: 'Incomplete' },
+                incorrect: { bg: 'bg-red-950/60 border-red-500/40 text-red-300', label: 'Needs Depth / Review' }
+              };
+              const cfg = qualityConfig[quality.quality] || qualityConfig.vague;
+              return (
+                <div className={`p-3 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2 ${cfg.bg}`}>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Answer Depth:</strong> {cfg.label} — {quality.feedback}</span>
+                  </div>
+                  {quality.indicators?.length > 0 && (
+                    <span className="font-mono text-[10px] text-slate-400">
+                      Signals: {quality.indicators.slice(0, 3).join(', ')}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* AI Contextual Follow-Up Trigger */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                disabled={isGeneratingFollowUp || !answer.trim() || answer.trim().length < 15}
+                onClick={async () => {
+                  setIsGeneratingFollowUp(true);
+                  try {
+                    const curQ = questions[currentQuestion];
+                    const res = await generateContextualFollowUp({
+                      question: curQ.question,
+                      answer: answer.trim(),
+                      personality: selectedPersonality,
+                      category: curQ.category || 'Technical'
+                    });
+                    setFollowUpQuestion(res);
+                  } catch (err) {
+                    console.warn("Follow-up error:", err);
+                  } finally {
+                    setIsGeneratingFollowUp(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-300 text-xs font-semibold transition disabled:opacity-50"
+              >
+                <Brain className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{isGeneratingFollowUp ? 'AI Interviewer Analyzing...' : '⚡ Probe Technical Decisions (AI Follow-Up)'}</span>
+              </button>
+              <span className="text-[11px] text-slate-500">Generates contextual cross-examination based on what you typed</span>
+            </div>
+
+            {/* AI Follow-Up Question Card */}
+            {followUpQuestion && (
+              <div className="bg-indigo-950/60 border border-indigo-500/40 rounded-xl p-4 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between text-xs font-bold text-indigo-300">
+                  <span className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                    Interviewer Cross-Examination ({INTERVIEW_PERSONALITIES[selectedPersonality]?.name.split('&')[0]})
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-900 text-indigo-200 border border-indigo-500/30 font-mono">
+                    {followUpQuestion.type}
+                  </span>
+                </div>
+                <p className="text-sm text-white font-medium italic">"{followUpQuestion.question}"</p>
+                {followUpQuestion.reasoning && (
+                  <p className="text-xs text-slate-400">Context: {followUpQuestion.reasoning}</p>
+                )}
+                <div>
+                  <textarea
+                    value={followUpAnswer}
+                    onChange={(e) => setFollowUpAnswer(e.target.value)}
+                    placeholder="Defend your architectural choice or explain your technical decision..."
+                    rows={3}
+                    className="w-full p-3 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* STAR Framework Real-time Assessment Coach */}
             {(() => {
