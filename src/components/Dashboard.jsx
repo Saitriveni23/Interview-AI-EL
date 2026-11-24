@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   FileText,
   Award,
@@ -10,8 +10,218 @@ import {
   Crosshair,
   CheckCircle,
   PlayCircle,
-  BookOpen
+  BookOpen,
+  X
 } from 'lucide-react';
+
+// ── Skill Heatmap ─────────────────────────────────────────────
+const HEATMAP_TOPICS = [
+  'React', 'Node.js', 'System Design', 'Algorithms',
+  'SQL', 'TypeScript', 'AWS', 'Docker',
+  'Caching', 'Databases', 'APIs', 'Testing'
+];
+
+function proficiencyColor(pct) {
+  if (pct < 40)  return { bg: 'bg-red-500/70',    border: 'border-red-500/40',    label: 'Needs Work' };
+  if (pct < 60)  return { bg: 'bg-orange-500/70',  border: 'border-orange-500/40', label: 'Developing' };
+  if (pct < 75)  return { bg: 'bg-yellow-500/70',  border: 'border-yellow-500/40', label: 'Fair' };
+  if (pct < 90)  return { bg: 'bg-green-500/70',   border: 'border-green-500/40',  label: 'Good' };
+  return             { bg: 'bg-emerald-500/70', border: 'border-emerald-500/40', label: 'Expert' };
+}
+
+function SkillHeatmap({ onPractice }) {
+  const [modalTopic, setModalTopic] = useState(null);
+  // deterministic pseudo-proficiency per topic
+  const topicPct = (t) => ((t.charCodeAt(0) * 7 + t.length * 13) % 71) + 20;
+  const topicDays = (t) => ((t.charCodeAt(1) || 5) * 3) % 21 + 1;
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+        <BarChart2 className="w-4 h-4 text-purple-400" />
+        Skill Proficiency Heatmap
+      </h3>
+      <div className="grid grid-cols-6 gap-2">
+        {HEATMAP_TOPICS.map((topic) => {
+          const pct = topicPct(topic);
+          const days = topicDays(topic);
+          const { bg, border, label } = proficiencyColor(pct);
+          return (
+            <button
+              key={topic}
+              title={`${topic}: ${pct}% — ${label}\nLast tested: ${days} days ago`}
+              onClick={() => setModalTopic({ topic, pct, days, label })}
+              className={`relative group ${bg} border ${border} rounded-xl p-2 text-center transition hover:scale-105 hover:brightness-125`}
+            >
+              <p className="text-[9px] font-semibold text-white leading-tight truncate">{topic}</p>
+              <p className="text-[8px] text-white/70 mt-0.5">{pct}%</p>
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-white text-[9px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-10 pointer-events-none">
+                Last tested: {days}d ago
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-3 text-[9px] text-slate-500 flex-wrap">
+        {[['<40%','bg-red-500/70'],['40-60%','bg-orange-500/70'],['60-75%','bg-yellow-500/70'],['75-90%','bg-green-500/70'],['90%+','bg-emerald-500/70']].map(([l,c])=>(
+          <span key={l} className="flex items-center gap-1"><span className={`w-2.5 h-2.5 rounded ${c}`}/>{l}</span>
+        ))}
+      </div>
+
+      {/* Practice Modal */}
+      {modalTopic && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setModalTopic(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-7 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-white font-bold text-lg">{modalTopic.topic}</h4>
+              <button onClick={() => setModalTopic(null)} className="text-slate-500 hover:text-white transition"><X className="w-4 h-4"/></button>
+            </div>
+            <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 ${proficiencyColor(modalTopic.pct).bg} text-white`}>
+              {modalTopic.label} — {modalTopic.pct}%
+            </div>
+            <p className="text-slate-400 text-sm mb-2">Last tested <span className="text-indigo-400 font-semibold">{modalTopic.days} days ago</span></p>
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-5">
+              <div className={`h-full rounded-full ${proficiencyColor(modalTopic.pct).bg}`} style={{ width: `${modalTopic.pct}%` }} />
+            </div>
+            <button
+              onClick={() => { setModalTopic(null); onPractice && onPractice(modalTopic.topic); }}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition"
+            >
+              Start Focused Practice →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Readiness Gauge ───────────────────────────────────────────
+function ReadinessGauge({ score = 72 }) {
+  const clamp = Math.max(0, Math.min(100, score));
+  // 180° semicircle: left end = 180°, right end = 0°
+  const angle = 180 - (clamp / 100) * 180; // degrees from bottom-left
+  const r = 70;
+  const cx = 90;
+  const cy = 90;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  // Arc from 180° to (180 - clamp*1.8)°
+  const startX = cx + r * Math.cos(toRad(180));
+  const startY = cy + r * Math.sin(toRad(180));
+  const endAngleDeg = 180 - (clamp / 100) * 180;
+  const endX = cx + r * Math.cos(toRad(endAngleDeg));
+  const endY = cy + r * Math.sin(toRad(endAngleDeg));
+  const largeArc = clamp > 50 ? 1 : 0;
+
+  // Color interpolation red→green via orange/yellow
+  const colorStop = clamp < 40 ? '#ef4444' : clamp < 65 ? '#f97316' : clamp < 80 ? '#eab308' : '#22c55e';
+
+  const tier = clamp >= 90 ? 'Expert Ready' : clamp >= 75 ? 'Well Prepared' : clamp >= 55 ? 'Getting There' : clamp >= 35 ? 'Needs Practice' : 'Just Starting';
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center">
+      <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+        <Award className="w-4 h-4 text-amber-400" />
+        Interview Readiness Score
+      </h3>
+      <svg width="180" height="100" viewBox="0 0 180 100">
+        {/* Background arc */}
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none" stroke="#1e293b" strokeWidth="12" strokeLinecap="round"
+        />
+        {/* Colored progress arc */}
+        {clamp > 0 && (
+          <path
+            d={`M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`}
+            fill="none" stroke={colorStop} strokeWidth="12" strokeLinecap="round"
+          />
+        )}
+        {/* Score text */}
+        <text x={cx} y={cy - 4} textAnchor="middle" fill="white" fontSize="22" fontWeight="bold">{clamp}%</text>
+        <text x={cx} y={cy + 14} textAnchor="middle" fill="#94a3b8" fontSize="8">{tier}</text>
+      </svg>
+      <div className="flex justify-between w-full mt-1 px-2 text-[9px] text-slate-600">
+        <span>0</span><span>50</span><span>100</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Week-over-Week Line Chart ──────────────────────────────────
+function WeeklyProgressChart({ sessions }) {
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  // Build 7-point dataset from sessions or demo data
+  const demo = [
+    { label: 'Mon', overall: 48, comm: 55 },
+    { label: 'Tue', overall: 54, comm: 58 },
+    { label: 'Wed', overall: 61, comm: 63 },
+    { label: 'Thu', overall: 59, comm: 70 },
+    { label: 'Fri', overall: 68, comm: 72 },
+    { label: 'Sat', overall: 73, comm: 75 },
+    { label: 'Sun', overall: 78, comm: 80 },
+  ];
+
+  const chartData = sessions.length >= 2
+    ? sessions.slice(-7).map((s, i) => ({
+        label: DAYS[new Date(s.date).getDay()],
+        overall: s.score ?? 50,
+        comm: Math.round((s.score ?? 50) * 0.9 + 10),
+      }))
+    : demo;
+
+  const W = 320, H = 120, PL = 28, PR = 8, PT = 10, PB = 24;
+  const innerW = W - PL - PR;
+  const innerH = H - PT - PB;
+  const n = chartData.length;
+  const xPos = (i) => PL + (i / (n - 1)) * innerW;
+  const yPos = (v) => PT + innerH - (v / 100) * innerH;
+
+  const toPolyline = (key) =>
+    chartData.map((d, i) => `${xPos(i)},${yPos(d[key])}`).join(' ');
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-indigo-400" />
+          Weekly Progress
+        </h3>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="flex items-center gap-1 text-indigo-400"><span className="w-3 h-0.5 bg-indigo-400 rounded inline-block"/>Overall</span>
+          <span className="flex items-center gap-1 text-purple-400"><span className="w-3 h-0.5 bg-purple-400 rounded inline-block"/>Communication</span>
+        </div>
+      </div>
+
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+        {/* Y-axis grid lines */}
+        {[0, 25, 50, 75, 100].map(v => (
+          <g key={v}>
+            <line x1={PL} x2={W - PR} y1={yPos(v)} y2={yPos(v)} stroke="#1e293b" strokeWidth="1" />
+            <text x={PL - 4} y={yPos(v) + 3} textAnchor="end" fill="#475569" fontSize="7">{v}</text>
+          </g>
+        ))}
+
+        {/* Overall line (indigo) */}
+        <polyline points={toPolyline('overall')} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {/* Communication line (purple) */}
+        <polyline points={toPolyline('comm')} fill="none" stroke="#a855f7" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 2" />
+
+        {/* Dots + tooltips */}
+        {chartData.map((d, i) => (
+          <g key={i}>
+            <title>{`${d.label}: Overall ${d.overall}%, Comm ${d.comm}%`}</title>
+            <circle cx={xPos(i)} cy={yPos(d.overall)} r="3.5" fill="#6366f1" stroke="#0f172a" strokeWidth="1.5" />
+            <circle cx={xPos(i)} cy={yPos(d.comm)} r="3.5" fill="#a855f7" stroke="#0f172a" strokeWidth="1.5" />
+            {/* X-axis label */}
+            <text x={xPos(i)} y={H - 4} textAnchor="middle" fill="#64748b" fontSize="7">{d.label}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
 
 const DEFAULT_SKILLS = ['System Design', 'Docker', 'AWS', 'TypeScript', 'React'];
 const DEFAULT_LEVELS  = [28, 42, 35, 55, 65];
@@ -97,6 +307,17 @@ export default function Dashboard({ onNavigate, parseResult, sessions = [] }) {
             </button>
           </div>
         </div>
+
+        {/* ── Analytics Row: Gauge + Weekly Chart ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <ReadinessGauge score={sessions.length > 0 ? (sessions[0].score ?? 72) : 72} />
+          <div className="lg:col-span-2">
+            <WeeklyProgressChart sessions={sessions} />
+          </div>
+        </div>
+
+        {/* ── Skill Heatmap ── */}
+        <SkillHeatmap onPractice={(topic) => onNavigate('interview')} />
 
         {/* ── Quick Stats ── */}
         <div className="grid grid-cols-3 gap-4">

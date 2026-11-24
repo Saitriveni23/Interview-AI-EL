@@ -1,5 +1,8 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { Brain, User, FlaskConical, ChevronLeft, Download, Save, Trophy, TrendingUp, AlertCircle, CheckCircle, Clock, Mic, MicOff, Volume2, VolumeX, Sparkles, Printer, ShieldCheck, Zap, Flame, Layers, MessageCircle, HelpCircle } from 'lucide-react';
+
+const VoiceInterviewMode = React.lazy(() => import('./VoiceInterviewMode.jsx'));
+const CodeSandbox = React.lazy(() => import('./CodeSandbox.jsx'));
 import {
   INTERVIEW_PERSONALITIES,
   INTERVIEW_TYPES,
@@ -873,6 +876,7 @@ export default function InterviewPanel({
   // Voice AI States
   const [isListening, setIsListening] = useState(false);
   const [isSpeakingQuestion, setIsSpeakingQuestion] = useState(false);
+  const [isCodeEditorOpen, setIsCodeEditorOpen] = useState(false);
   const recognitionRef = useRef(null);
 
   // Stop speech when component unmounts or question changes
@@ -1416,40 +1420,68 @@ export default function InterviewPanel({
                 Your Answer
               </label>
 
-              {/* Voice Answer Button */}
-              <button
-                type="button"
-                onClick={toggleListening}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                  isListening
-                    ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
-                    : 'bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300'
-                }`}
-              >
-                {isListening ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>Listening... Speak now</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>🎙️ Answer with Voice (Microphone)</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Code Sandbox Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsCodeEditorOpen(!isCodeEditorOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    isCodeEditorOpen
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                  }`}
+                >
+                  <span>💻 {isCodeEditorOpen ? 'Text Mode' : 'Code Sandbox'}</span>
+                </button>
+
+                {/* Voice Answer Button */}
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                      : 'bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300'
+                  }`}
+                >
+                  {isListening ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>Listening... Speak now</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>🎙️ Answer with Voice</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder={isListening ? "Listening to your voice... Speak clearly into your microphone." : "Type your answer here or click 'Answer with Voice'..."}
-              rows={6}
-              className={`w-full p-4 rounded-xl bg-slate-950 border ${
-                isListening ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-slate-700'
-              } text-white focus:outline-none focus:border-indigo-500 transition`}
-            />
+            {isCodeEditorOpen ? (
+              <Suspense fallback={<div className="p-4 text-xs text-slate-400">Loading Code Sandbox...</div>}>
+                <CodeSandbox
+                  question={questions[currentQuestion]?.question}
+                  onSubmit={({ code, language, passed, failed, timeMs }) => {
+                    setAnswer(`// Solution (${language}) - Passed: ${passed}, Failed: ${failed} (${timeMs}ms)\n\n${code}`);
+                    setIsCodeEditorOpen(false);
+                  }}
+                  onSkip={() => setIsCodeEditorOpen(false)}
+                />
+              </Suspense>
+            ) : (
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder={isListening ? "Listening to your voice... Speak clearly into your microphone." : "Type your answer here or click 'Answer with Voice'..."}
+                rows={6}
+                className={`w-full p-4 rounded-xl bg-slate-950 border ${
+                  isListening ? 'border-red-500/60 ring-2 ring-red-500/20' : 'border-slate-700'
+                } text-white focus:outline-none focus:border-indigo-500 transition`}
+              />
+            )}
 
             {/* Live Answer Quality Indicator */}
             {(() => {

@@ -13,20 +13,29 @@ import {
   Award,
   Mic,
   MicOff,
-  RotateCcw
+  RotateCcw,
+  GitBranch,
+  Building2,
+  FileDown
 } from 'lucide-react';
 import {
   extractResumeClaims,
   evaluateDefenseResponse,
   generateResumeDefenseReport
 } from '../services/resumeDefenseService.js';
+import GitHubVerifier from './GitHubVerifier.jsx';
+import CompanyDefenseMode from './CompanyDefenseMode.jsx';
+import { exportDefenseReportPDF } from '../services/pdfExportService.js';
 
 export default function ResumeDefenseView({
+  resumeText = '',
   redactedResumeText = '',
   targetInfo = {},
+  onReportGenerated,
   onNavigateToIntelligence
 }) {
-  const [claims, setClaims] = useState(() => extractResumeClaims(redactedResumeText));
+  const resumeSource = resumeText || redactedResumeText || '';
+  const [claims, setClaims] = useState(() => extractResumeClaims(resumeSource));
   const [selectedClaimId, setSelectedClaimId] = useState(null);
   const [currentChallenge, setCurrentChallenge] = useState('');
   const [candidateDefense, setCandidateDefense] = useState('');
@@ -34,6 +43,7 @@ export default function ResumeDefenseView({
   const [defenseHistory, setDefenseHistory] = useState([]);
   const [defenseReport, setDefenseReport] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [activeTab, setActiveTab] = useState('cross_exam'); // 'cross_exam' | 'github' | 'company'
 
   // Initialize selected claim
   useEffect(() => {
@@ -45,15 +55,15 @@ export default function ResumeDefenseView({
 
   // Update claim list if resume changes
   useEffect(() => {
-    if (redactedResumeText) {
-      const extracted = extractResumeClaims(redactedResumeText);
+    if (resumeSource) {
+      const extracted = extractResumeClaims(resumeSource);
       setClaims(extracted);
       if (extracted.length > 0) {
         setSelectedClaimId(extracted[0].id);
         setCurrentChallenge(extracted[0].challenges[0]);
       }
     }
-  }, [redactedResumeText]);
+  }, [resumeSource]);
 
   const activeClaim = claims.find(c => c.id === selectedClaimId) || claims[0];
 
@@ -136,8 +146,9 @@ export default function ResumeDefenseView({
 
       // Auto update report
       const evaluatedClaims = updatedClaims.filter(c => c.evaluation);
-      const rep = generateResumeDefenseReport(evaluatedClaims);
+      const rep = generateResumeDefenseReport(evaluatedClaims, targetInfo);
       setDefenseReport(rep);
+      if (onReportGenerated) onReportGenerated(rep);
 
       // Advance to next challenge if available
       const nextIdx = (activeClaim.currentChallengeIndex || 0) + 1;
@@ -151,8 +162,13 @@ export default function ResumeDefenseView({
     }
   };
 
-  const handlePrintReport = () => {
-    window.print();
+  const handleExportPDF = () => {
+    if (!defenseReport) {
+      const currentRep = generateResumeDefenseReport(claims.filter(c => c.evaluation), targetInfo);
+      exportDefenseReportPDF(currentRep, targetInfo?.candidateName || 'Candidate');
+    } else {
+      exportDefenseReportPDF(defenseReport, targetInfo?.candidateName || 'Candidate');
+    }
   };
 
   return (
@@ -175,32 +191,90 @@ export default function ResumeDefenseView({
           </p>
         </div>
 
-        {defenseReport && (
-          <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 p-3 rounded-xl flex-shrink-0">
-            <div className="text-center">
-              <span className="block text-[10px] text-slate-400 font-semibold uppercase">Credibility Score</span>
-              <span className={`text-2xl font-black font-mono ${
-                defenseReport.overallCredibilityScore >= 80 ? 'text-emerald-400' : defenseReport.overallCredibilityScore >= 60 ? 'text-amber-400' : 'text-rose-400'
-              }`}>
-                {defenseReport.overallCredibilityScore}%
-              </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {defenseReport && (
+            <div className="flex items-center gap-3 bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex-shrink-0">
+              <div className="text-center px-1">
+                <span className="block text-[10px] text-slate-400 font-semibold uppercase">Credibility</span>
+                <span className={`text-xl font-black font-mono ${
+                  defenseReport.overallCredibilityScore >= 80 ? 'text-emerald-400' : defenseReport.overallCredibilityScore >= 60 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {defenseReport.overallCredibilityScore}%
+                </span>
+              </div>
             </div>
-            <button
-              onClick={handlePrintReport}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-              title="Print Defense Report"
-            >
-              <Printer className="w-4 h-4 text-indigo-400" />
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={handleExportPDF}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-1.5"
+            title="Download PDF Defense Report"
+          >
+            <FileDown className="w-4 h-4 text-indigo-400" />
+            <span>Export PDF</span>
+          </button>
+        </div>
       </div>
 
-      {/* ── Main Arena: Claims Column + Defense Interrogation Column ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* ── Sub-navigation Mode Switcher ── */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <button
+          onClick={() => setActiveTab('cross_exam')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'cross_exam'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>Cross-Examination ({claims.length} Claims)</span>
+        </button>
 
-        {/* Left Column: Extracted Resume Claims (4 cols) */}
-        <div className="lg:col-span-5 space-y-3">
+        <button
+          onClick={() => setActiveTab('github')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'github'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <GitBranch className="w-3.5 h-3.5" />
+          <span>GitHub Project Verifier</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('company')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'company'
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Company-Specific Defense</span>
+        </button>
+      </div>
+
+      {/* Tab Panels */}
+      {activeTab === 'github' && (
+        <GitHubVerifier
+          resumeClaims={claims.map(c => c.rawText)}
+          onVerified={() => {}}
+        />
+      )}
+
+      {activeTab === 'company' && (
+        <CompanyDefenseMode
+          resumeClaims={claims.map(c => c.rawText)}
+          onStartDefense={(comp, qs) => {
+            setActiveTab('cross_exam');
+          }}
+        />
+      )}
+
+      {activeTab === 'cross_exam' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Extracted Resume Claims (4 cols) */}
+          <div className="lg:col-span-5 space-y-3">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4 text-rose-400" />
@@ -447,6 +521,7 @@ export default function ResumeDefenseView({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

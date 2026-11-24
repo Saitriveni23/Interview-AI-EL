@@ -27,6 +27,9 @@ import {
   calculateIntelligenceMetrics,
   generateTargetedPracticeDrills
 } from '../services/interviewIntelligenceService.js';
+import { evaluateAnswerWithLLM } from '../services/llmScoringService.js';
+import Session from '../db/models/Session.js';
+import UserProgress from '../db/models/UserProgress.js';
 
 const router = Router();
 
@@ -665,6 +668,167 @@ router.post('/intelligence-metrics', (req, res) => {
   } catch (error) {
     console.error('Intelligence metrics calculation error:', error);
     return res.status(500).json({ success: false, error: 'Failed to calculate intelligence metrics' });
+  }
+});
+
+// ==========================================
+// 9. LLM ANSWER SCORING & EVALUATION
+// ==========================================
+
+router.post('/evaluate-answer-llm', async (req, res) => {
+  try {
+    const {
+      question = '',
+      answer = '',
+      category = 'Technical',
+      difficulty = 'Intermediate',
+      personality = 'professional'
+    } = req.body;
+
+    const evaluation = await evaluateAnswerWithLLM({
+      question,
+      answer,
+      category,
+      difficulty,
+      personality
+    });
+
+    return res.json({ success: true, evaluation });
+  } catch (error) {
+    console.error('LLM evaluation error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to evaluate answer with LLM' });
+  }
+});
+
+// ==========================================
+// 10. MONGODB SESSION PERSISTENCE & USER PROGRESS
+// ==========================================
+
+// In-memory fallback stores when MongoDB is offline
+const inMemorySessions = new Map(); // userId -> [sessions]
+const inMemoryProgress = new Map(); // userId -> progressObj
+
+router.post('/sessions/save', async (req, res) => {
+  try {
+    const {
+      userId = 'anon_candidate',
+      targetRole = 'Full Stack Developer',
+      company = 'Target Tech',
+      score = 80,
+      answers = [],
+      evaluation = {},
+      metadata = {}
+    } = req.body;
+
+    let savedSessionId = 'sess_' + Date.now();
+
+    if (isDBConnected()) {
+      const newSession = await Session.create({
+        userId,
+        targetRole,
+        company,
+        score,
+        answers,
+        evaluation,
+        metadata
+      });
+      savedSessionId = newSession._id.toString();
+
+      // Update User Progress
+      const existingProgress = await UserProgress.findOne({ userId });
+      if (existingProgress) {
+        existingProgress.sessionsCompleted += 1;
+        existingProgress.readinessScore = Math.round(
+          (existingProgress.readinessScore * 0.7) + (score * 0.3)
+        );
+        const lastDate = existingProgress.lastPracticeDate ? new Date(existingProgress.lastPracticeDate) : null;
+        const today = new Date();
+        if (lastDate && (today - lastDate) < 48 * 3600 * 1000) {
+          existingProgress.streak += 1;
+        } else if (!lastDate) {
+          existingProgress.streak = 1;
+        }
+        existingProgress.lastPracticeDate = today;
+        await existingProgress.save();
+      } else {
+        await UserProgress.create({
+          userId,
+          readinessScore: score,
+          sessionsCompleted: 1,
+          streak: 1,
+          lastPracticeDate: new Date()
+        });
+      }
+    } else {
+      // In-memory fallback
+      const userList = inMemorySessions.get(userId) || [];
+      const sessionObj = {
+        _id: savedSessionId,
+        userId,
+        targetRole,
+        company,
+        score,
+        answers,
+        evaluation,
+        date: new Date().toISOString()
+      };
+      userList.unshift(sessionObj);
+      inMemorySessions.set(userId, userList);
+
+      const prog = inMemoryProgress.get(userId) || {
+        userId,
+        readinessScore: score,
+        sessionsCompleted: 0,
+        streak: 1
+      };
+      prog.sessionsCompleted += 1;
+      prog.readinessScore = Math.round((prog.readinessScore * 0.7) + (score * 0.3));
+      inMemoryProgress.set(userId, prog);
+    }
+
+    return res.json({ success: true, sessionId: savedSessionId });
+  } catch (error) {
+    console.error('Session save error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save session' });
+  }
+});
+
+router.get('/sessions/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (isDBConnected()) {
+      const sessions = await Session.find({ userId }).sort({ createdAt: -1 }).limit(50);
+      return res.json({ success: true, sessions });
+    } else {
+      const sessions = inMemorySessions.get(userId) || [];
+      return res.json({ success: true, sessions });
+    }
+  } catch (error) {
+    console.error('Fetch sessions error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch sessions' });
+  }
+});
+
+router.get('/sessions/:userId/progress', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (isDBConnected()) {
+      const progress = await UserProgress.findOne({ userId });
+      return res.json({ success: true, progress: progress || null });
+    } else {
+      const progress = inMemoryProgress.get(userId) || {
+        userId,
+        readinessScore: 82,
+        sessionsCompleted: 5,
+        streak: 4
+      };
+      return res.json({ success: true, progress });
+    }
+  } catch (error) {
+    console.error('Fetch progress error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch user progress' });
   }
 });
 

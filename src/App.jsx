@@ -1,14 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import ResumeUploader from './components/ResumeUploader';
 import RedactionViewer from './components/RedactionViewer';
 import SkillParserView from './components/SkillParserView';
-import InterviewPanel from './components/InterviewPanel';
-import ResumeDefenseView from './components/ResumeDefenseView';
-import IntelligenceDashboard from './components/IntelligenceDashboard';
 import AuthModal from './components/AuthModal';
+
+// Lazy-loaded heavy page components
+const IntelligenceDashboard = lazy(() => import('./components/IntelligenceDashboard'));
+const ResumeDefenseView = lazy(() => import('./components/ResumeDefenseView'));
+const InterviewPanel = lazy(() => import('./components/InterviewPanel'));
+const VoiceInterviewMode = lazy(() => import('./components/VoiceInterviewMode'));
+const SessionReplay = lazy(() => import('./components/SessionReplay'));
+const JDParserView = lazy(() => import('./components/JDParserView'));
+const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
+
+// Page-level loading fallback
+function PageLoader() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-slate-400 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
 import { analyzeResumeClientSide } from './services/clientFallbackService.js';
 import { ShieldAlert, Award, MessageSquare, BookOpen, Plus, ChevronRight, Brain, ShieldCheck } from 'lucide-react';
 
@@ -163,11 +181,13 @@ function UploadPage({
                 </p>
               </div>
             </div>
-            <InterviewPanel
-              targetInfo={{ company: 'Google', role: 'Full Stack Developer' }}
-              candidateSkills={['JavaScript', 'React', 'Node.js', 'SQL']}
-              redactedResumeText=""
-            />
+            <Suspense fallback={<PageLoader />}>
+              <InterviewPanel
+                targetInfo={{ company: 'Google', role: 'Full Stack Developer' }}
+                candidateSkills={['JavaScript', 'React', 'Node.js', 'SQL']}
+                redactedResumeText=""
+              />
+            </Suspense>
           </div>
         )}
 
@@ -271,29 +291,35 @@ function UploadPage({
             )}
 
             {activeResultTab === 'defense' && (
-              <ResumeDefenseView
-                resumeText={parseResult.redactedText || ''}
-                targetInfo={parseResult.targetInfo}
-                onReportGenerated={onReportGenerated}
-              />
+              <Suspense fallback={<PageLoader />}>
+                <ResumeDefenseView
+                  resumeText={parseResult.redactedText || ''}
+                  targetInfo={parseResult.targetInfo}
+                  onReportGenerated={onReportGenerated}
+                />
+              </Suspense>
             )}
 
             {activeResultTab === 'interview' && (
-              <InterviewPanel
-                targetInfo={parseResult.targetInfo}
-                candidateSkills={parseResult.candidateProfile?.skills || []}
-                redactedResumeText={parseResult.redactedText || ''}
-              />
+              <Suspense fallback={<PageLoader />}>
+                <InterviewPanel
+                  targetInfo={parseResult.targetInfo}
+                  candidateSkills={parseResult.candidateProfile?.skills || []}
+                  redactedResumeText={parseResult.redactedText || ''}
+                />
+              </Suspense>
             )}
 
             {activeResultTab === 'intelligence' && (
-              <IntelligenceDashboard
-                sessions={sessions}
-                interviewEvaluations={[]}
-                resumeDefenseReport={defenseReport}
-                deltaAnalysis={parseResult.deltaAnalysis}
-                onStartTargetedPractice={onStartTargetedPractice}
-              />
+              <Suspense fallback={<PageLoader />}>
+                <IntelligenceDashboard
+                  sessions={sessions}
+                  interviewEvaluations={[]}
+                  resumeDefenseReport={defenseReport}
+                  deltaAnalysis={parseResult.deltaAnalysis}
+                  onStartTargetedPractice={onStartTargetedPractice}
+                />
+              </Suspense>
             )}
           </div>
         )}
@@ -330,12 +356,14 @@ function InterviewPage({ parseResult, onNavigate, drillPreset = null }) {
           </div>
         )}
 
-        <InterviewPanel
-          targetInfo={targetInfo}
-          candidateSkills={candidateSkills}
-          redactedResumeText={redactedResumeText}
-          drillPreset={drillPreset}
-        />
+        <Suspense fallback={<PageLoader />}>
+          <InterviewPanel
+            targetInfo={targetInfo}
+            candidateSkills={candidateSkills}
+            redactedResumeText={redactedResumeText}
+            drillPreset={drillPreset}
+          />
+        </Suspense>
       </div>
     </div>
   );
@@ -592,25 +620,102 @@ export default function App() {
       case 'defense':
         return (
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-7xl mx-auto w-full">
-            <ResumeDefenseView
-              resumeText={parseResult?.redactedText || (savedSession?.candidateProfile ? JSON.stringify(savedSession.candidateProfile) : 'Senior Full Stack Engineer. Improved latency by 40% across distributed microservices. Led team of 8 engineers and migrated Postgres to Kafka event streaming.')}
-              targetInfo={parseResult?.targetInfo || { role: 'Full Stack Developer', company: 'Google' }}
-              onReportGenerated={handleDefenseReportGenerated}
-            />
+            <Suspense fallback={<PageLoader />}>
+              <ResumeDefenseView
+                resumeText={parseResult?.redactedText || (savedSession?.candidateProfile ? JSON.stringify(savedSession.candidateProfile) : 'Senior Full Stack Engineer. Improved latency by 40% across distributed microservices. Led team of 8 engineers and migrated Postgres to Kafka event streaming.')}
+                targetInfo={parseResult?.targetInfo || { role: 'Full Stack Developer', company: 'Google' }}
+                onReportGenerated={handleDefenseReportGenerated}
+              />
+            </Suspense>
           </div>
         );
 
       case 'intelligence':
         return (
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-7xl mx-auto w-full">
-            <IntelligenceDashboard
-              sessions={sessions}
-              interviewEvaluations={[]}
-              resumeDefenseReport={defenseReport}
-              deltaAnalysis={parseResult?.deltaAnalysis || null}
-              onStartTargetedPractice={handleStartTargetedPractice}
-            />
+            <Suspense fallback={<PageLoader />}>
+              <IntelligenceDashboard
+                sessions={sessions}
+                interviewEvaluations={[]}
+                resumeDefenseReport={defenseReport}
+                deltaAnalysis={parseResult?.deltaAnalysis || null}
+                onStartTargetedPractice={handleStartTargetedPractice}
+              />
+            </Suspense>
           </div>
+        );
+
+      case 'voice':
+        return (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-4xl mx-auto w-full">
+            <Suspense fallback={<PageLoader />}>
+              <VoiceInterviewMode
+                question="Tell me about a challenging distributed systems or architectural bug you identified and resolved in production."
+                questionNumber={1}
+                totalQuestions={5}
+                timeLimit={120}
+                onAnswerSubmit={(transcript, meta) => {
+                  alert(`Voice Response Submitted!\nTranscript: "${transcript.slice(0, 100)}..."\nFillers Detected: ${meta.fillerCount}\nDuration: ${meta.duration}s\nConfidence: ${meta.confidenceLevel}`);
+                }}
+                onSkip={() => {}}
+              />
+            </Suspense>
+          </div>
+        );
+
+      case 'replay':
+        return (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 max-w-5xl mx-auto w-full">
+            <Suspense fallback={<PageLoader />}>
+              <SessionReplay
+                session={sessions[0] || {
+                  targetRole: parseResult?.targetInfo?.role || 'Full Stack Developer',
+                  company: parseResult?.targetInfo?.company || 'Google',
+                  date: new Date().toISOString(),
+                  questions: [
+                    'How does the JavaScript event loop handle microtasks vs macrotasks?',
+                    'Explain how you would scale a WebSocket server handling 100k concurrent connections.',
+                    'Describe a time you disagreed with a product requirement and how you navigated it.'
+                  ],
+                  answers: [
+                    'Microtasks such as Promise callbacks and process.nextTick are drained immediately after each execution frame before macrotasks like setTimeout or setInterval.',
+                    'I would distribute connections across Node instances using Redis Pub/Sub as an adapter, terminate TLS at HAProxy/Nginx, and increase OS file descriptor limits.',
+                    'I gathered telemetry metrics proving user drop-off, proposed an MVP with A/B testing, and collaborated with the PM to validate our hypothesis.'
+                  ],
+                  scores: [94, 91, 88]
+                }}
+                onClose={() => setActivePage('sessions')}
+              />
+            </Suspense>
+          </div>
+        );
+
+      case 'jdparser':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <JDParserView
+              resumeSkills={parseResult?.candidateProfile?.skills || ['JavaScript', 'React', 'Node.js', 'SQL', 'TypeScript']}
+              onStartInterview={(jd, qs) => {
+                setDrillPreset({
+                  category: 'Technical',
+                  difficulty: 'Intermediate',
+                  label: `${jd.role} @ ${jd.company}`
+                });
+                setActivePage('interview');
+              }}
+              onNavigate={handleNavigate}
+            />
+          </Suspense>
+        );
+
+      case 'leaderboard':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <LeaderboardView
+              currentUser={currentUser}
+              sessions={sessions}
+            />
+          </Suspense>
         );
 
       case 'upload':

@@ -8,16 +8,24 @@ import {
   Zap,
   Clock,
   ShieldAlert,
-  Brain
+  Brain,
+  Mic,
+  FileSearch,
+  Trophy,
+  History
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Home', icon: Home },
   { id: 'sessions', label: 'My Sessions', icon: Clock },
+  { id: 'replay', label: 'Session Replay', icon: History },
   { id: 'upload', label: 'Resume Builder', icon: FileText },
+  { id: 'jdparser', label: 'JD Importer', icon: FileSearch },
   { id: 'defense', label: 'Resume Defense', icon: ShieldAlert },
   { id: 'interview', label: 'Adaptive Interview', icon: PlayCircle },
+  { id: 'voice', label: 'Voice Practice', icon: Mic },
   { id: 'intelligence', label: 'Intelligence Radar', icon: Brain },
+  { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

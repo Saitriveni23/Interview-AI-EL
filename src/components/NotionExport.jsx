@@ -1,0 +1,280 @@
+import React, { useState } from 'react';
+import { Copy, Download, ExternalLink, FileText, CheckCircle } from 'lucide-react';
+
+function buildMarkdownContent({ parseResult, sessions, defenseReport }) {
+  const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const targetRole = parseResult?.targetInfo?.role || 'Software Engineer';
+  const targetCompany = parseResult?.targetInfo?.company || 'Target Company';
+  const matchPct = parseResult?.deltaAnalysis?.matchPercentage ?? 0;
+  const candidateSkills = parseResult?.candidateProfile?.skills || [];
+  const missingSkills = parseResult?.deltaAnalysis?.missingSkills || [];
+  const studyPlan = parseResult?.studyPlan || null;
+  const defenseStrengths = defenseReport?.strengths || [];
+  const defenseWeaknesses = defenseReport?.weaknesses || [];
+
+  const lines = [
+    `# 🎯 Interview Preparation Report`,
+    `**Generated:** ${now}  `,
+    `**Target Role:** ${targetRole} @ ${targetCompany}  `,
+    `**Resume Match Score:** ${matchPct}%`,
+    ``,
+    `---`,
+    ``,
+    `## 📊 Interview Summary`,
+    ``,
+    `| Metric | Value |`,
+    `|--------|-------|`,
+    `| Target Role | ${targetRole} |`,
+    `| Target Company | ${targetCompany} |`,
+    `| Match Score | ${matchPct}% |`,
+    `| Practice Sessions | ${sessions.length} |`,
+    `| Skills Identified | ${candidateSkills.length} |`,
+    `| Skill Gaps | ${missingSkills.length} |`,
+    ``,
+    `---`,
+    ``,
+    `## ✅ Your Current Skills`,
+    ``,
+    candidateSkills.length > 0
+      ? candidateSkills.map(s => `- ${s}`).join('\n')
+      : '- No skills detected yet. Please upload your resume.',
+    ``,
+    `---`,
+    ``,
+    `## ⚠️ Skill Gaps to Address`,
+    ``,
+    missingSkills.length > 0
+      ? missingSkills.map(s => `- [ ] ${s}`).join('\n')
+      : '- 🎉 No critical skill gaps detected!',
+    ``,
+    `---`,
+    ``,
+  ];
+
+  if (defenseStrengths.length > 0 || defenseWeaknesses.length > 0) {
+    lines.push(`## 🛡️ Resume Defense Analysis`, ``);
+    if (defenseStrengths.length > 0) {
+      lines.push(`### Strengths`, ...defenseStrengths.map(s => `- ✅ ${s}`), ``);
+    }
+    if (defenseWeaknesses.length > 0) {
+      lines.push(`### Areas to Improve`, ...defenseWeaknesses.map(s => `- ⚠️ ${s}`), ``);
+    }
+    lines.push(`---`, ``);
+  }
+
+  // Study Plan
+  lines.push(`## 📚 Study Plan`, ``);
+  if (studyPlan && studyPlan.weeks) {
+    for (const week of studyPlan.weeks) {
+      lines.push(`### Week ${week.week}: ${week.theme || week.focus || 'Focus Area'}`, ``);
+      if (week.topics) lines.push(...week.topics.map(t => `- ${t}`));
+      lines.push(``);
+    }
+  } else if (missingSkills.length > 0) {
+    lines.push(
+      `### Week 1-2: Foundation`,
+      ...missingSkills.slice(0, 3).map(s => `- [ ] Learn ${s} fundamentals`),
+      ``,
+      `### Week 3-4: Practice`,
+      ...missingSkills.slice(0, 3).map(s => `- [ ] Build a project using ${s}`),
+      ``,
+      `### Week 5-6: Interview Prep`,
+      `- [ ] Practice 2 LeetCode problems daily`,
+      `- [ ] Do 3 mock interviews`,
+      `- [ ] Review system design concepts`,
+      ``,
+    );
+  } else {
+    lines.push(
+      `### Week 1-2: Sharpen Core Skills`,
+      `- [ ] Review data structures and algorithms`,
+      `- [ ] Practice 2 LeetCode problems daily`,
+      ``,
+      `### Week 3-4: System Design`,
+      `- [ ] Study Designing Data-Intensive Applications`,
+      `- [ ] Practice 2 system design problems`,
+      ``,
+      `### Week 5-6: Mock Interviews`,
+      `- [ ] Do 5+ mock interviews`,
+      `- [ ] Review company-specific coding patterns`,
+      ``,
+    );
+  }
+
+  lines.push(
+    `---`,
+    ``,
+    `## 🔗 Recommended Resources`,
+    ``,
+    `### Courses & Books`,
+    `- 📖 [Designing Data-Intensive Applications](https://dataintensive.net) — Martin Kleppmann`,
+    `- 🎓 [System Design Interview](https://www.youtube.com/@ByteByteGo) — ByteByteGo`,
+    `- 💻 [LeetCode Blind 75](https://leetcode.com/discuss/general-discussion/460599/blind-75-leetcode-questions)`,
+    `- 🤖 [Stanford ML Course](https://www.coursera.org/specializations/machine-learning-introduction) — Andrew Ng`,
+    ``,
+    `### Practice Platforms`,
+    `- [LeetCode](https://leetcode.com) — Coding interview prep`,
+    `- [Pramp](https://pramp.com) — Live mock interviews`,
+    `- [Excalidraw](https://excalidraw.com) — System design diagrams`,
+    `- [interviewing.io](https://interviewing.io) — Anonymous mock interviews`,
+    ``,
+    `### Session History`,
+    ``,
+  );
+
+  if (sessions.length > 0) {
+    lines.push(
+      `| Date | Role | Company | Score |`,
+      `|------|------|---------|-------|`,
+      ...sessions.slice(0, 10).map(s =>
+        `| ${new Date(s.date).toLocaleDateString()} | ${s.targetRole || '—'} | ${s.company || '—'} | ${s.score != null ? `${s.score}%` : '—'} |`
+      ),
+    );
+  } else {
+    lines.push(`_No practice sessions recorded yet._`);
+  }
+
+  lines.push(``, `---`, ``, `*Generated by Interview AI EL — Powered by Gemini*`);
+  return lines.join('\n');
+}
+
+export default function NotionExport({ parseResult, sessions = [], defenseReport }) {
+  const [copied, setCopied] = useState(null);
+
+  const markdown = buildMarkdownContent({ parseResult, sessions, defenseReport });
+  const targetRole = parseResult?.targetInfo?.role || 'Interview Prep';
+  const targetCompany = parseResult?.targetInfo?.company || '';
+  const title = `${targetRole}${targetCompany ? ` @ ${targetCompany}` : ''} — Interview Prep Report`;
+
+  const handleCopyNotion = async () => {
+    await navigator.clipboard.writeText(markdown);
+    setCopied('notion');
+    setTimeout(() => setCopied(null), 2500);
+  };
+
+  const handleGoogleDocs = () => {
+    // Opens a new Google Doc with pre-filled title
+    const encodedTitle = encodeURIComponent(title);
+    window.open(`https://docs.new?title=${encodedTitle}`, '_blank');
+    // Also copy content so user can paste
+    navigator.clipboard.writeText(markdown).catch(() => {});
+  };
+
+  const handleCopyStudyPlan = async () => {
+    const studyLines = markdown.split('\n').filter(l => {
+      return l.startsWith('## 📚') || l.startsWith('### Week') || l.startsWith('- [ ]') || l.startsWith('- 📖') || l.startsWith('- 🎓') || l.startsWith('- 💻');
+    });
+    await navigator.clipboard.writeText(studyLines.join('\n'));
+    setCopied('plan');
+    setTimeout(() => setCopied(null), 2500);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `interview-prep-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const buttons = [
+    {
+      id: 'notion',
+      label: 'Export to Notion',
+      sublabel: 'Copies Notion-compatible markdown',
+      icon: <Copy className="w-4 h-4" />,
+      action: handleCopyNotion,
+      color: 'bg-slate-800 hover:bg-slate-700 border-slate-700',
+      emoji: '📋',
+    },
+    {
+      id: 'gdocs',
+      label: 'Export to Google Docs',
+      sublabel: 'Opens docs.new with pre-filled title',
+      icon: <ExternalLink className="w-4 h-4" />,
+      action: handleGoogleDocs,
+      color: 'bg-blue-900/40 hover:bg-blue-900/60 border-blue-700/40',
+      emoji: '📄',
+    },
+    {
+      id: 'plan',
+      label: 'Copy Study Plan',
+      sublabel: 'Copies just the study plan section',
+      icon: <Copy className="w-4 h-4" />,
+      action: handleCopyStudyPlan,
+      color: 'bg-emerald-900/30 hover:bg-emerald-900/50 border-emerald-700/40',
+      emoji: '📚',
+    },
+    {
+      id: 'download',
+      label: 'Download .md File',
+      sublabel: 'Full report as a Markdown file',
+      icon: <Download className="w-4 h-4" />,
+      action: handleDownload,
+      color: 'bg-indigo-900/40 hover:bg-indigo-900/60 border-indigo-700/40',
+      emoji: '⬇️',
+    },
+  ];
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-indigo-600/20 border border-indigo-500/30 rounded-xl flex items-center justify-center">
+          <FileText className="w-5 h-5 text-indigo-400" />
+        </div>
+        <div>
+          <h3 className="text-white font-bold text-base">Export Report</h3>
+          <p className="text-slate-400 text-xs mt-0.5">Share your interview prep notes anywhere</p>
+        </div>
+      </div>
+
+      {/* Export buttons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {buttons.map(btn => (
+          <button
+            key={btn.id}
+            onClick={btn.action}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition group ${btn.color}`}
+          >
+            <span className="text-xl flex-shrink-0">{btn.emoji}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white leading-tight">{btn.label}</p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">{btn.sublabel}</p>
+            </div>
+            {copied === btn.id ? (
+              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            ) : (
+              <span className="text-slate-500 group-hover:text-slate-300 transition flex-shrink-0">{btn.icon}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Preview */}
+      <div>
+        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-2">Preview</p>
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 max-h-48 overflow-y-auto">
+          <pre className="text-xs text-slate-400 whitespace-pre-wrap font-mono leading-relaxed">
+            {markdown.slice(0, 1200)}{markdown.length > 1200 ? '\n...' : ''}
+          </pre>
+        </div>
+      </div>
+
+      {/* Notion instructions */}
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-xs text-slate-400 space-y-1">
+        <p className="text-amber-400 font-semibold">📌 How to import into Notion</p>
+        <ol className="list-decimal list-inside space-y-0.5 text-slate-400">
+          <li>Click <strong className="text-slate-300">"Export to Notion"</strong> above to copy the markdown</li>
+          <li>Open Notion → create a new page</li>
+          <li>Type <code className="bg-slate-800 px-1 rounded">/import</code> and choose "Import Markdown"</li>
+          <li>Paste the content — Notion auto-formats headers, tables, and checkboxes</li>
+        </ol>
+      </div>
+    </div>
+  );
+}

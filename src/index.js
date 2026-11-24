@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import resumeRoutes from './routes/resume.js';
 import { connectDB, isDBConnected } from './db/mongo.js';
+import { generalLimiter, aiLimiter } from './middleware/rateLimiter.js';
 
 dotenv.config();
 
@@ -16,6 +17,11 @@ connectDB();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiters
+app.use('/api', generalLimiter);
+app.use('/api/resume/adaptive-question', aiLimiter);
+app.use('/api/resume/evaluate-answer-llm', aiLimiter);
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
