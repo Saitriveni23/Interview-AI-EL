@@ -12,7 +12,9 @@ import {
   Mic,
   FileSearch,
   Trophy,
-  History
+  History,
+  Layers,
+  Building2
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -23,7 +25,10 @@ const NAV_ITEMS = [
   { id: 'jdparser', label: 'JD Importer', icon: FileSearch },
   { id: 'defense', label: 'Resume Defense', icon: ShieldAlert },
   { id: 'interview', label: 'Adaptive Interview', icon: PlayCircle },
+  { id: 'whiteboard', label: 'System Design', icon: Layers },
+  { id: 'faang', label: 'Bar Raiser Packs', icon: Building2 },
   { id: 'voice', label: 'Voice Practice', icon: Mic },
+  { id: 'flashcards', label: 'Voice Flashcards', icon: Zap },
   { id: 'intelligence', label: 'Intelligence Radar', icon: Brain },
   { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
   { id: 'settings', label: 'Settings', icon: Settings },

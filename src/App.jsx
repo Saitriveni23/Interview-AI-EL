@@ -15,6 +15,10 @@ const VoiceInterviewMode = lazy(() => import('./components/VoiceInterviewMode'))
 const SessionReplay = lazy(() => import('./components/SessionReplay'));
 const JDParserView = lazy(() => import('./components/JDParserView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
+const SystemDesignWhiteboard = lazy(() => import('./components/SystemDesignWhiteboard'));
+const FAANGCompanyPacks = lazy(() => import('./components/FAANGCompanyPacks'));
+const VoiceFlashcardsView = lazy(() => import('./components/VoiceFlashcardsView'));
+const WebcamBodyLanguageCoach = lazy(() => import('./components/WebcamBodyLanguageCoach'));
 
 // Page-level loading fallback
 function PageLoader() {
@@ -355,6 +359,10 @@ function InterviewPage({ parseResult, onNavigate, drillPreset = null }) {
             </button>
           </div>
         )}
+
+        <Suspense fallback={null}>
+          <WebcamBodyLanguageCoach />
+        </Suspense>
 
         <Suspense fallback={<PageLoader />}>
           <InterviewPanel
@@ -715,6 +723,27 @@ export default function App() {
               currentUser={currentUser}
               sessions={sessions}
             />
+          </Suspense>
+        );
+
+      case 'whiteboard':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <SystemDesignWhiteboard />
+          </Suspense>
+        );
+
+      case 'faang':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <FAANGCompanyPacks />
+          </Suspense>
+        );
+
+      case 'flashcards':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <VoiceFlashcardsView />
           </Suspense>
         );
 

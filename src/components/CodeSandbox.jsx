@@ -14,6 +14,56 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
+import { Lightbulb, CheckCircle2, AlertTriangle, Sparkles, HelpCircle, Gauge } from 'lucide-react';
+
+// ------------------------------------
+// PROGRESSIVE HINTS DICTIONARY
+// ------------------------------------
+const HINTS_MAP = {
+  'binary-search': [
+    { level: 1, title: 'Conceptual Nudge', content: 'The input array is already sorted. Instead of checking element by element, can you eliminate half of the remaining array in each step?' },
+    { level: 2, title: 'Structural Pseudocode', content: 'Set left = 0, right = arr.length - 1. While left <= right, calculate mid = Math.floor((left + right) / 2). If arr[mid] === target, return mid. If arr[mid] < target, search right (left = mid + 1). Else search left (right = mid - 1).' },
+    { level: 3, title: 'Complexity & Edge Cases', content: 'Optimal Time is O(log N), Space is O(1). Watch out for empty array (`arr.length === 0`) and target not found (return -1).' }
+  ],
+  'palindrome-check': [
+    { level: 1, title: 'Conceptual Nudge', content: 'A palindrome reads identical forwards and backwards. Can you check outer characters first, working inwards?' },
+    { level: 2, title: 'Structural Pseudocode', content: 'Set i = 0, j = str.length - 1. While i < j, if str[i] !== str[j] return false. Then i++, j--. If the loop completes without mismatches, return true.' },
+    { level: 3, title: 'Complexity & Edge Cases', content: 'Optimal Time is O(N), Space is O(1). Handles single-character strings and empty strings gracefully as valid palindromes.' }
+  ],
+  'two-sum': [
+    { level: 1, title: 'Conceptual Nudge', content: 'A nested loop takes O(N^2) time. Can you trade a little space (a hash map) to look up the needed partner value in O(1)?' },
+    { level: 2, title: 'Structural Pseudocode', content: 'Instantiate `const map = new Map()`. Loop through `nums`. For each num at index i, compute `diff = target - num`. If `map.has(diff)`, return `[map.get(diff), i]`. Otherwise `map.set(num, i)`.' },
+    { level: 3, title: 'Complexity & Edge Cases', content: 'Optimal Time is O(N), Space is O(N). Assumes exactly one valid solution pair exists.' }
+  ]
+};
+
+function analyzeStaticComplexity(codeStr, claimedTime, claimedSpace) {
+  const forLoops = (codeStr.match(/for\s*\(/g) || []).length;
+  const whileLoops = (codeStr.match(/while\s*\(/g) || []).length;
+  const hasSort = /\.sort\s*\(/.test(codeStr);
+  const hasMap = /new\s+(Map|Set)\s*\(|\{\s*\}/.test(codeStr);
+  const totalLoops = forLoops + whileLoops;
+
+  let estimatedTime = 'O(N)';
+  if (totalLoops >= 2) estimatedTime = 'O(N^2)';
+  else if (hasSort) estimatedTime = 'O(N log N)';
+  else if (totalLoops === 1 && (codeStr.includes('/ 2') || codeStr.includes('>> 1'))) estimatedTime = 'O(log N)';
+  else if (totalLoops === 0) estimatedTime = 'O(1)';
+
+  let estimatedSpace = hasMap ? 'O(N)' : 'O(1)';
+  const timeMatch = claimedTime === estimatedTime;
+  const spaceMatch = claimedSpace === estimatedSpace;
+
+  return {
+    estimatedTime,
+    estimatedSpace,
+    timeMatch,
+    spaceMatch,
+    verdict: (timeMatch && spaceMatch)
+      ? 'Complexity verified! Implementation matches your declaration.'
+      : `Static analysis detected ${estimatedTime} time & ${estimatedSpace} space.`
+  };
+}
 
 // ------------------------------------
 // PRE-BUILT TEST CASES FOR DSA QUESTIONS
@@ -173,7 +223,19 @@ export default function CodeSandbox({
   const [output, setOutput] = useState({ stdout: '', stderr: '', results: [] });
   const [isRunning, setIsRunning] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [revealedHintLevel, setRevealedHintLevel] = useState(0);
+  const [claimedTime, setClaimedTime] = useState('O(log N)');
+  const [claimedSpace, setClaimedSpace] = useState('O(1)');
+  const [complexityReport, setComplexityReport] = useState(null);
   const textareaRef = useRef(null);
+
+  const testSuiteKey = question.toLowerCase().includes('palindrome')
+    ? 'palindrome-check'
+    : question.toLowerCase().includes('two sum')
+    ? 'two-sum'
+    : 'binary-search';
+
+  const hints = HINTS_MAP[testSuiteKey] || HINTS_MAP['binary-search'];
 
   // Determine effective test cases
   const effectiveTestCases = propTestCases || detectTestSuite(question) || BUILTIN_TEST_CASES['binary-search'];
@@ -255,10 +317,12 @@ export default function CodeSandbox({
     });
 
     const timeMs = Math.round(performance.now() - startTime);
+    const comp = analyzeStaticComplexity(code, claimedTime, claimedSpace);
+    setComplexityReport(comp);
 
     setIsRunning(false);
     setOutput({ stdout: logs.join('\n'), stderr: '', results, timeMs });
-  }, [code, language, effectiveTestCases]);
+  }, [code, language, effectiveTestCases, claimedTime, claimedSpace]);
 
   // Submit solution
   const handleSubmit = () => {
@@ -293,6 +357,86 @@ export default function CodeSandbox({
           )}
         </div>
       </div>
+
+      {/* ---- Progressive Hint & Big-O Controls ---- */}
+      <div className="px-5 py-2.5 bg-slate-950/70 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRevealedHintLevel(prev => Math.min(3, prev + 1))}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold transition"
+          >
+            <Lightbulb className="w-3.5 h-3.5" />
+            <span>{revealedHintLevel === 0 ? 'Need a Hint?' : `Hint (${revealedHintLevel}/3) — Reveal Next`}</span>
+          </button>
+          {revealedHintLevel > 0 && (
+            <button
+              type="button"
+              onClick={() => setRevealedHintLevel(0)}
+              className="text-[11px] text-slate-500 hover:text-slate-300"
+            >
+              Hide
+            </button>
+          )}
+        </div>
+
+        {/* Big-O Complexity Target selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 font-mono text-[11px] flex items-center gap-1">
+            <Gauge className="w-3.5 h-3.5 text-cyan-400" /> Big-O:
+          </span>
+          <select
+            value={claimedTime}
+            onChange={(e) => setClaimedTime(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-cyan-300 font-mono focus:outline-none"
+          >
+            <option value="O(1)">Time: O(1)</option>
+            <option value="O(log N)">Time: O(log N)</option>
+            <option value="O(N)">Time: O(N)</option>
+            <option value="O(N log N)">Time: O(N log N)</option>
+            <option value="O(N^2)">Time: O(N^2)</option>
+          </select>
+          <select
+            value={claimedSpace}
+            onChange={(e) => setClaimedSpace(e.target.value)}
+            className="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-purple-300 font-mono focus:outline-none"
+          >
+            <option value="O(1)">Space: O(1)</option>
+            <option value="O(N)">Space: O(N)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Render active hints */}
+      {revealedHintLevel > 0 && (
+        <div className="bg-amber-950/20 border-b border-amber-500/20 px-5 py-2.5 space-y-2">
+          {hints.slice(0, revealedHintLevel).map((h) => (
+            <div key={h.level} className="text-xs space-y-0.5">
+              <span className="font-bold text-amber-300 flex items-center gap-1 text-[11px]">
+                <Sparkles className="w-3 h-3" /> Tier {h.level}: {h.title}
+              </span>
+              <p className="text-slate-300 leading-relaxed text-[11px] font-mono">{h.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Complexity report banner if available */}
+      {complexityReport && (
+        <div className={`px-5 py-2 border-b text-xs flex items-center justify-between font-mono ${
+          complexityReport.timeMatch && complexityReport.spaceMatch
+            ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-300'
+            : 'bg-amber-950/30 border-amber-500/20 text-amber-300'
+        }`}>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {complexityReport.verdict}
+          </span>
+          <span className="text-[10px] text-slate-400">
+            Target: {claimedTime} / {claimedSpace}
+          </span>
+        </div>
+      )}
 
       {/* ---- Toolbar ---- */}
       <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 flex items-center gap-3 flex-wrap">
