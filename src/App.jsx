@@ -19,6 +19,7 @@ const SystemDesignWhiteboard = lazy(() => import('./components/SystemDesignWhite
 const FAANGCompanyPacks = lazy(() => import('./components/FAANGCompanyPacks'));
 const VoiceFlashcardsView = lazy(() => import('./components/VoiceFlashcardsView'));
 const WebcamBodyLanguageCoach = lazy(() => import('./components/WebcamBodyLanguageCoach'));
+const CareerOpsStudio = lazy(() => import('./components/CareerOpsStudio'));
 
 // Page-level loading fallback
 function PageLoader() {
@@ -722,6 +723,16 @@ export default function App() {
             <LeaderboardView
               currentUser={currentUser}
               sessions={sessions}
+            />
+          </Suspense>
+        );
+
+      case 'careerops':
+        return (
+          <Suspense fallback={<PageLoader />}>
+            <CareerOpsStudio
+              candidateCV={parseResult?.redactedText || 'Senior Full Stack & Systems Engineer. TypeScript, React, Node.js, PostgreSQL, Redis, Docker, System Design, REST APIs, Git.'}
+              onStartInterview={() => setActivePage('interview')}
             />
           </Suspense>
         );

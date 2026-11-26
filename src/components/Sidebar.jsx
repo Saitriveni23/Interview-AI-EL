@@ -14,12 +14,14 @@ import {
   Trophy,
   History,
   Layers,
-  Building2
+  Building2,
+  Briefcase
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Home', icon: Home },
   { id: 'sessions', label: 'My Sessions', icon: Clock },
+  { id: 'careerops', label: 'CareerOps Pipeline', icon: Briefcase },
   { id: 'replay', label: 'Session Replay', icon: History },
   { id: 'upload', label: 'Resume Builder', icon: FileText },
   { id: 'jdparser', label: 'JD Importer', icon: FileSearch },
